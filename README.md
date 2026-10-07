@@ -1,7 +1,8 @@
 # AI Floorplans — 3D apartment reconstruction, furniture fitting & renovation
 
-Turns the floor plan in `floor-plans/E2-floorplan.jpg` (Packenham House, Third Floor) into a
-structured, validated apartment model, and renders it as an interactive 3D planner. You can
+Turns the floor plan in `floor-plans/E2-floorplan.jpg` (Packenham House, Third Floor), or a
+floor-plan image you import (automatic extraction, reviewed before use), into a structured,
+validated apartment model, and renders it as an interactive 3D planner. You can
 furnish and renovate rooms, and an assistant turns natural language into structured edits.
 
 ```
@@ -48,24 +49,50 @@ Individual scripts: `npm run typecheck`, `npm run lint`, `npm run format` / `for
   placement constraints.
 - **Toolbar**: ceilings on/off, plan overlay, dimension labels, day/night/interior lighting,
   undo/redo (**Ctrl+Z / Ctrl+Y**), save (browser storage, **Ctrl+S**), load, JSON export/import.
+- **Import plan** (toolbar): choose a PNG, JPEG or WebP floor plan. It is extracted **on this
+  device**; nothing is uploaded. The review shows:
+  - walls, doors, windows and rooms drawn over the image;
+  - counts with their confidence;
+  - the scale and how it was obtained;
+  - every problem the extractor could not resolve (click one to locate it on the plan).
+
+  You can correct the scale with a known measurement ("Bedroom is 3.84 m wide"), which re-runs
+  the extraction. **Accept** builds the 3D model through the normal pipeline. When the result
+  needs review you must confirm you checked it; a failed extraction cannot be accepted.
 - **Assistant**: e.g. *"Put a 3-seat sofa against the longest wall in the living room"*,
   *"Can I fit a king-size bed in bedroom 1?"*, *"Renovate bedroom 2 with warm wood flooring and
   light beige walls"*. Each reply shows the structured intent it executed.
 
 ## Architecture
 
+```
+  any floor plan ─► extractor (manual today, automatic later) ─► FloorPlanAnnotations
+                                                                       │ validateAnnotations
+                                                                       ▼
+                                   calibrate ─► reconstructApartment ─► Apartment (schema v2)
+                                                                       │ validateApartment
+                     ┌─────────────────────┬──────────────────────────┼───────────────────┐
+                     ▼                     ▼                          ▼                   ▼
+                 2D plan view          3D scene              engine (placement,      AI: JSON contract
+                 (plan2d)              (scene)               zones, fitFurniture)    → Intent → engine
+                     └─────── selection/edits go through stores + Commands ──────────────┘
+```
+
 | Layer | Folder | Responsibility |
 |---|---|---|
-| Domain | `src/domain` | Typed model (`types.ts`), geometry, coordinate conversion, topology, validation, serialization + migrations. No React, no three.js. |
-| Floor-plan reconstruction | `src/floorplan` | Pixel-space annotation of the plan → scale calibration → deterministic `reconstructApartment()`. |
+| Domain | `src/domain` | Typed model (`types.ts`), per-field provenance, geometry (concave-safe), coordinates, topology, validation, serialization and migrations. Depends on nothing else in the app: no React, three.js, DOM or catalogs. |
+| Floor-plan pipeline | `src/floorplan` | Generic: the `FloorPlanAnnotations` format and its runtime schema (`annotationSchema.ts`), `validateAnnotations`, calibration, `reconstructApartment`, the extraction boundary (`FloorPlanExtractor`, `buildApartment`) and the extraction service (`extractionService.ts`). |
+| Automatic extraction | `src/floorplan/cv` | Image → `FloorPlanAnnotations`: preprocessing, wall vectorisation, openings, railings, room segmentation, OCR text, dimension lines, calibration, confidence, review, and accuracy metrics. Pure TypeScript; runs in the browser and in Node tests. |
+| Reference plans | `src/floorplan/fixtures/` | `e2/`: the real plan, with pixel-fidelity, reconstruction and **automatic-extraction** tests. Three synthetic plans (`synthetic/`, `synthetic-mm/`, `synthetic-corridor/`): their images in `floor-plans/test/` are rendered from their annotations by `scripts/render-test-plans.ts`. |
+| Configuration | `src/config/plans.ts` | Composition root: which plans exist, the default plan, and catalog lookups injected into validation. |
 | Catalogs | `src/catalog` | Material library, furniture catalog (real dimensions, asset abstraction, placement rules), renovation presets. |
-| Engine | `src/engine` | `checkPlacement()` (room containment, walls, fixtures, furniture, door swings, clearances) and `fitFurniture(floor, roomId, requests, constraints)`. All constraints live in `constraints.ts`. |
-| Editing | `src/editor` | Serialisable `Command`s applied by a pure `applyCommand()`, plus spatial operations (`planTransform`, `planAddFurniture`…) that return a command and a report. |
-| State | `src/state` | Three separate stores: **document** (apartment + undo/redo history), **scene** (camera, selection, visibility, debug, constraints) and **UI** (tabs, dialogs, chat). |
-| AI | `src/ai` | `Intent` types, `IntentProvider` interface, an offline rule-based provider, and `executeIntent()`, which validates intents and runs them through the engine. |
-| 3D | `src/scene` | R3F components that only *read* the model. Pure builders (`builders/`) turn walls, openings, doors and polygons into mesh data and are unit-tested. |
-| 2D | `src/plan2d` | The original plan image with room/furniture polygons drawn in plan pixels. |
-| UI | `src/ui`, `src/app` | Figma-based shell (Property Scanner design tokens), panels, inspector, assistant, keyboard shortcuts. |
+| Engine | `src/engine` | `checkPlacement` (structural / furniture / functional-zone / clearance rules, each with a size in metres), `functionalZones` (door swing and access, window access), `fitFurniture` (+ `explainFit`), and memoised conflicts. Catalog is injectable. |
+| Editing | `src/editor` | Serialisable `Command`s applied by a pure `applyCommand()`, plus spatial operations that return a command and a report. |
+| State | `src/state` | **Document** (apartment, undo/redo with cached validation, baseline for Cancel), **scene** (camera, selection, visibility, debug, constraints), **UI** (tabs, dialogs, chat). |
+| AI | `src/ai` | `Intent`/`AssistantIntent`, the rule-based provider, the **LLM JSON contract** (`parseAssistantJson`, strict and bounded), `JsonIntentProvider` (injected transport), and `executeAssistantIntent`. |
+| 3D | `src/scene` | R3F components that only _read_ the model, with narrow store subscriptions. Shared materials and a shared unit box. Pure, unit-tested builders. |
+| 2D | `src/plan2d` | The original plan with model polygons drawn in plan pixels; keyboard-accessible. |
+| UI | `src/ui`, `src/app` | Figma-based shell, panels, inspector (with provenance details), assistant, shortcuts, session restore. |
 | Persistence | `src/persistence` | `ProjectRepository` interface + `localStorage` implementation, JSON export. |
 
 ### Coordinate system and scale
@@ -77,39 +104,137 @@ Individual scripts: `npm run typecheck`, `npm run lint`, `npm run format` / `for
   `src/domain/coordinates.ts`.
 - Rotations follow three.js `rotation.y`: an item's front (local +Z) faces `(sin r, cos r)`.
 
-**Scale is calibrated, not hard-coded.** `calibrate.ts` pairs each printed room dimension with
-the drawn span it describes, takes the median px/m, rejects outliers (> 3 %) and averages the
-rest. For E2 that gives **88.15 px/m from 7 printed dimensions, max deviation 0.6 %**.
+**Scale is data, not a constant.** References come from printed room dimensions or free-standing
+dimension lines (any angle). Calibration takes the median px/m, rejects outliers (> 3 %) and
+averages the rest, recording every sample and a **confidence**:
+
+- **high**: at least 3 references agreeing within 2 %;
+- **medium**: at least 2 references within 5 %;
+- **low**: a single reference or a manual scale.
+
+E2 calibrates to **88.15 px/m from 7 references (max deviation 0.6 %, high)**.
+
+### Measured vs assumed (provenance)
+
+Each wall, door, window, room and fixture records where each property came from (`sources`):
+
+| Provenance | Shown as | Example |
+|---|---|---|
+| `plan-label` | known | a printed room size |
+| `plan-geometry` | measured | a wall length at the calibrated scale |
+| `detected` / `estimated` | estimated | automatic-extractor output, manual scale |
+| `inferred` | inferred | an unlabelled cupboard, a doorless opening |
+| `assumed` | assumed | ceiling 2.4 m, door 2.0 m, window sills |
+| `user` | user | a sill height typed by the user |
+
+Entities may also carry an extractor `confidence`. The inspector's **Details** section shows all
+of this, and dimensions are formatted with "≈" and "(assumed)" from the data, never hard-coded.
 
 ### Model shape
 
-`Apartment → floors[] → { rooms, walls, doors, windows, stairs, fixtures, furniture }`, with
-`schemaVersion`, `metadata` (assumptions + reconstruction notes) and `coordinateSystem`.
+`Apartment (schemaVersion 2) → floors[] → { rooms, walls, doors, windows, stairs, fixtures, furniture }`,
+with `metadata` (assumptions, reconstruction notes, annotation source) and `coordinateSystem`.
 
-- Rooms are polygons, which can be non-rectangular: Bedroom 2 is L-shaped, and the open-plan
-  room has a notch for a wall nib.
-- Walls are centrelines with thickness and height. Doors and windows reference a wall and an
-  offset along it.
-- Walls, doors and windows exist once on the floor; rooms reference them by id (`wallIds`,
-  `doorIds`, `windowIds`), and these references are derived from geometry.
-- Area and extents are **computed** from polygons, never stored, so they cannot drift.
-- Each room has a `renovation` record (finishes and lighting), separate from its geometry.
+- Rooms are any simple polygon, including concave ones (Bedroom 2 is L-shaped; the open-plan
+  room has a nib notch).
+- Walls are centrelines at any angle. Doors and windows reference a wall plus an offset along
+  it; a window's head height is derived as sill + height.
+- Walls, doors and windows exist once per floor. Rooms reference them by id, and those
+  references are derived from geometry.
+- Area and extents are computed, never stored.
+- A room's `renovation` is separate from its geometry. Changing a finish is a command on the
+  model, and the scene swaps a cached material.
+- **Saves are versioned and migrated.** `src/domain/migrations.ts` upgrades v1 files (as saved
+  by the first release) to v2. A real v1 save file is kept as a test fixture.
 
-### Why an annotation instead of image→3D
+### Floor-plan pipeline and the extraction boundary
 
-There was no extraction code in the repository, and an AI-generated model would not be
-verifiable. The plan is therefore described once, in **pixel coordinates measured from the
-image**, in `src/floorplan/annotations/packenhamHouseE2.ts`. Reconstruction is deterministic.
-`annotationFidelity.test.ts` decodes the JPEG and checks that:
+Every plan becomes `FloorPlanAnnotations` (image-pixel coordinates), whether a person
+described it (`fixtures/e2/annotations.ts`, checked against the JPEG by
+`fixtures/e2/fidelity.test.ts`) or the extractor read it from an image:
 
-- every wall lies on wall fill;
-- every opening is a gap;
-- every room interior is clear.
+```ts
+FloorPlanExtractor.extract(source) → { annotations, stages, warnings, confidence, calibration, review }
+```
 
-So the annotation cannot silently drift from the plan. An automated extractor (vectoriser or
-ML) only needs to output the same `FloorPlanAnnotation` format.
+Everything after that is shared: `validateAnnotations → calibrate → reconstructApartment →
+validateApartment`. Reconstruction records whether annotations were manual or automatic
+(provenance `plan-geometry` vs `detected`) but never branches on it.
 
-## What was extracted from the plan
+### Automatic extraction (`src/floorplan/cv`)
+
+```
+image ─► preprocess ─► walls ─► openings ─► railings ─► rooms ─► text (OCR) ─► dimensions ─► calibration ─► annotations ─► review
+```
+
+| Stage | Module | How |
+|---|---|---|
+| Preprocess | `preprocess.ts`, `raster.ts`, `morphology.ts` | Contrast stretch, Otsu ink threshold, exact Euclidean distance transform; wall thickness classes from the stroke-width histogram of the thick ink. Linear time. |
+| Walls | `walls.ts` | Morphological opening keeps wall fill (and short solid piers); Zhang–Suen skeleton → pixel graph → spur pruning → Douglas–Peucker; centreline and thickness re-measured from perpendicular profiles; collinear merge; L-corners and T-junctions reconciled. Any angle. |
+| Openings | `openings.ts` | Gaps between collinear walls, or from a wall end to a crossing wall (walking through short stubs); gaps are split at piers. A **door** needs a leaf line and a swing arc around an empty sector (double doors: two arcs); its clear width is measured between drawn door frames. A **window** needs ≥ 2 glazing lines inside the wall band (also when drawn in half the thickness). A gap with no symbol stays an **uncertain opening**. Doors drawn across solid fill must pass a smooth-arc test. |
+| Railings | `railings.ts` | Two parallel thin lines with paper between them, both ends connected to walls or to another band. |
+| Rooms | `rooms.ts` | Walls rasterised and closed across openings; free regions not reachable from the image border are rooms (minimum size and width); boundaries traced along pixel edges → polygons (concave shapes kept). Balconies and terraces are exterior rooms. |
+| Text | `text.ts`, `textRegions.ts`, `ocrTesseract.ts` | Offline Tesseract (LSTM, English). A whole-page pass, plus a single-line read of every proposed text line on an image where everything except the glyphs is whitened; the more meaningful reading wins. Room names are matched to a lexicon with bounded edit distance (digit/letter confusions are used only for matching; the printed text is kept). |
+| Dimensions | `text.ts`, `dimensionLines.ts` | `3.84m x 2.66m`, `4200 x 3100`, `12.00 m`… Pairs are matched to their room's extent; single values are measured tick to tick along the dimension line next to them. |
+| Calibration | `../calibrate.ts` | Priority: a user reference measurement › printed dimensions (median, outliers rejected) › a typed scale › an **estimate** from typical door widths or wall thickness. An estimate is always labelled ESTIMATED with low confidence and is never presented as measured. A printed scale that implies implausible door widths is flagged. |
+| Review | `review.ts` | Every uncertainty becomes a problem: low-confidence elements, symbol-less openings, unnamed or inferred rooms, labels outside any room, re-read or rejected dimensions, an estimated scale, validation errors. Errors (e.g. no rooms) → **failed**, and no 3D model is built. |
+| Metrics | `metrics.ts` | Extracted vs ground-truth annotations, in metres at the ground-truth scale (see below). |
+
+No stage knows any specific plan. All thresholds are relative to the plan's own measured wall
+thickness and text height.
+
+**Service boundary.** The UI uses `FloorPlanExtractionService` (`extractionService.ts`).
+`LocalExtractionService` (the default) runs everything in the browser. The OCR worker, WASM
+core and English model are served from `/ocr`, copied from `node_modules` at build time by a
+Vite plugin (no CDN, no key). `RemoteExtractionService` posts the image to an endpoint **of this
+deployment**, which may call a hosted vision model with credentials kept server-side; the
+browser never holds keys. The reply must be `{ "annotations": FloorPlanAnnotations }`. It is
+parsed strictly by `parseAnnotationsJson`: unknown fields, wrong enums or non-finite numbers are
+rejected, never repaired. Calibration, confidence and review are then recomputed client-side, so
+a server cannot declare its own output "ok". `VISION_EXTRACTION_INSTRUCTIONS` documents the
+contract for a vision model, which only ever produces annotations, never geometry or rendering
+instructions. No server endpoint ships yet.
+
+**Running it on a file** (Node): `extractFromImage(loadImageFile(path), source, { ocr: nodeOcrProvider() })`.
+**Regenerating the synthetic test images**: `node scripts/render-test-plans.ts` (uses a locally
+installed Chrome/Edge in headless mode).
+
+### Extraction accuracy
+
+Ground truth is the hand-made annotations (E2's were not changed for this). A wall counts as
+detected when ≥ 80 % of its centreline is covered by an extracted wall. At junctions, endpoint
+errors accept either the centreline or the outer face. Rooms match at IoU ≥ 0.5, and doors and
+windows within 0.6 m. Everything is in metres at the ground-truth scale. Reproduce with
+`npx vitest run src/floorplan/fixtures --silent=false`.
+
+| Plan | Scale error | Walls | Wall endpoint error (median / max) | Rooms (IoU mean / min) | Doors (width error, median) | Windows |
+|---|---|---|---|---|---|---|
+| **E2** (real, 1485×1080, 88 px/m) | **0.04 %** | **23/24** (95.8 %), 0 false | 1 mm / 66 mm | **9/10** (0.987 / 0.942) | **9/10**, 0 false (11 mm); swing + hinge 7/7 | **4/4**, 0 false |
+| synthetic-angled (50 px/m, 45° wall) | 0.25 % | 9/9 | 3 mm / 97 mm | 2/2 (0.996) | 2/2 (5 mm) | 2/2 |
+| synthetic-mm (60 px/m, grey walls, jambs, mm) | 0.82 % | 9/9 | 7 mm / 19 mm | 5/5 (0.982 / 0.977) | 5/5 (33 mm) | 4/4 |
+| synthetic-corridor (40 px/m, railing, serif) | 0.21 % | 14/14 | 3 mm / 16 mm | 9/9 (0.997 / 0.977) | 9/9 (6 mm) | 6/6 |
+
+E2 misses three things:
+- the airing-cupboard front, which is not drawn on the plan, so the cupboard merges into the hall;
+- the cupboard's bifold door;
+- the kitchen nib's kind: it is merged with the collinear external wall and classed exterior.
+
+Room names: all 9 matched rooms are labelled correctly. In the browser build, extracting E2
+including OCR takes about 4–7 s.
+
+### AI boundary
+
+Natural language → `IntentProvider` → `AssistantIntent` → `executeAssistantIntent` → engine →
+`Command`. An LLM plugs in via `JsonIntentProvider(complete)` and must answer with the JSON
+contract in `src/ai/llmContract.ts`. `parseAssistantJson` rejects (it never repairs):
+
+- unknown intents or fields, and unknown rooms, furniture or materials;
+- out-of-range quantities and clearances;
+- oversized payloads.
+
+It reports every error at once, so the model can be re-prompted.
+
+## What the E2 ground-truth annotations contain (described by hand)
 
 | Element | Result |
 |---|---|
@@ -123,6 +248,35 @@ ML) only needs to output the same `FloorPlanAnnotation` format.
 | Stairs, columns, shafts | None drawn on this plan |
 
 ## Known limitations
+
+### Automatic extraction
+
+- **Readiness: prototype / internal beta.** It is measured on one real plan and three synthetic
+  plans drawn by our own renderer. That is not evidence for arbitrary estate-agent plans, scans,
+  photos or CAD exports: expect lower accuracy there, and always review.
+- **Not handled yet**:
+  - walls drawn as hatching or outlines only (apart from thin railings), and curved walls;
+  - sliding and bifold door symbols, stairs, multi-storey sheets;
+  - rotated text (vertical dimension strings are ignored), imperial-only plans, non-English labels;
+  - fixtures and fittings: none are extracted, so furniture fitting does not avoid them.
+- **Undrawn boundaries cannot be recovered.** A cupboard without a drawn front merges into the
+  adjoining room. A doorway without a door symbol is kept only as an uncertain opening.
+- **A merged wall has one kind.** A collinear run that is partly external is classed external.
+- **Noise and photos.** The wall detector can find spurious "walls" in noisy images. Such
+  results normally fail review because no rooms close, but there is no "is this a floor plan?"
+  check.
+- **A single printed dimension** means the scale cannot be cross-checked (this is flagged). An
+  OCR misread of the only dimension would mis-scale the plan; a door-width plausibility check
+  flags large errors.
+- **It runs on the main thread.** Stages yield so progress stays visible. Images are reduced to
+  2400 px on the longest side. The OCR assets add about 14 MB to the deployment and are fetched
+  only when a plan is imported.
+- **Uploaded images are not persisted.** A saved project keeps the geometry. After a reload, its
+  2D background and "Rebuild from floor plan" are unavailable until the image is imported again.
+- **No server-side extraction endpoint or vision-model integration is deployed.** The client and
+  the contract exist.
+
+### Model and planner
 
 - **Heights are assumptions**: ceiling 2.4 m, doors 2.0 m, window sills and heads, balustrade
   1.1 m, fixture heights. None of these are on the plan; they appear in the Model tab and are
@@ -138,7 +292,12 @@ ML) only needs to output the same `FloorPlanAnnotation` format.
 - The 4 cupboards are unlabelled on the plan. Their names are inferred. The thin outline at the
   top-left of the kitchen is drawn without any label, so its purpose and height are unknown.
 - Furniture models are parametric primitives (they rebuild exactly from real dimensions). glTF
-  assets are supported through the catalog's `asset` field, but none are bundled.
+  assets are supported through the catalog's `asset` field, but none are bundled Placement
+  never depends on how an item is rendered.
+- Only orthogonal fittings get detailed models; other fixture outlines render as extrusions.
+- Renovation is per room. Per-wall-face finishes (accent walls) are not modelled yet.
+- Dragging furniture in 3D is not covered by automated tests (WebGL in headless Chrome); the
+  same `planTransform` path is tested via numeric moves, nudges and keyboard.
 - The assistant uses an offline rule-based parser. An LLM can be plugged in through
   `setIntentProvider()`; it must emit the same validated `Intent` JSON.
 - Saving uses browser `localStorage` and JSON files. There is no backend yet.
@@ -146,9 +305,12 @@ ML) only needs to output the same `FloorPlanAnnotation` format.
 
 ## Recommended next steps
 
-1. **Automated extraction**: produce `FloorPlanAnnotation` from new uploads (wall
-   vectorisation, OCR for labels and dimensions). Calibration, reconstruction and fidelity checks
-   already exist.
+1. **Extraction**:
+   - a corpus of real plans with ground truth (the metrics module is ready);
+   - then fixtures, sliding and bifold doors, outline walls and rotated text;
+   - a Web Worker, and persisting uploaded images;
+   - an in-review editor (move a wall, rename a room) before accepting;
+   - optionally a server-side vision model behind `RemoteExtractionService`.
 2. **Larger catalog with glTF assets** (kitchen islands, vanities, showers).
 3. **Smarter fitting**: functional zones, circulation paths between doors, multi-item layouts
    and scoring.

@@ -1,11 +1,11 @@
 import { Edges } from '@react-three/drei';
 import { useThree, type ThreeEvent } from '@react-three/fiber';
-import { memo, Suspense, useMemo, useRef } from 'react';
+import { memo, Suspense, useRef } from 'react';
 import * as THREE from 'three';
 import { getCatalogItem } from '../../catalog/furnitureCatalog';
 import type { FurnitureItem, Vec2 } from '../../domain/types';
 import { planTransform } from '../../editor/operations';
-import { checkPlacement } from '../../engine/placement';
+import { furnitureConflicts } from '../../engine/conflicts';
 import { selectFloor, useDocument } from '../../state/documentStore';
 import { useScene } from '../../state/sceneStore';
 import { useUi } from '../../state/uiStore';
@@ -22,11 +22,7 @@ export function Furniture() {
   const visible = useScene((s) => s.showFurniture);
   const selected = useScene((s) => (s.selection?.kind === 'furniture' ? s.selection.id : null));
   // Conflicts are recomputed from the model; nothing about validity is stored on meshes.
-  const conflicts = useMemo(() => {
-    const out = new Set<string>();
-    for (const item of floor.furniture) if (checkPlacement(floor, item, constraints).hard) out.add(item.id);
-    return out;
-  }, [floor, constraints]);
+  const conflicts = furnitureConflicts(floor, constraints);
   if (!visible) return null;
   return (
     <group name="furniture">

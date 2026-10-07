@@ -114,9 +114,16 @@ export function planDuplicate(
     const copy: FurnitureItem = { ...item, id: newId(), position: add(item.position, o) };
     const report = checkPlacement(floor, copy, constraints);
     if (!report.hard && report.roomId) {
+      const placed = { ...copy, roomId: report.roomId };
       return {
-        command: { type: 'furniture/add', item: { ...copy, roomId: report.roomId } },
-        result: { request: { catalogId: item.catalogId }, ok: true, item: copy, issues: report.issues },
+        command: { type: 'furniture/add', item: placed },
+        result: {
+          request: { catalogId: item.catalogId },
+          ok: true,
+          item: placed,
+          issues: report.issues,
+          candidatesTried: 1,
+        },
       };
     }
   }

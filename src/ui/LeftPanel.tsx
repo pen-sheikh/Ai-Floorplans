@@ -1,5 +1,4 @@
 import { saveProject } from '../app/actions';
-import { loadApartmentFromPlan } from '../floorplan';
 import { useDocument } from '../state/documentStore';
 import { useScene } from '../state/sceneStore';
 import { useUi, type LeftTab } from '../state/uiStore';
@@ -21,8 +20,8 @@ export function LeftPanel() {
   const dirty = useDocument((s) => s.dirty);
 
   const cancel = () => {
-    if (dirty && !window.confirm('Discard unsaved changes and start again from the floor plan?')) return;
-    useDocument.getState().load(loadApartmentFromPlan());
+    if (dirty && !window.confirm('Discard unsaved changes since the last save?')) return;
+    useDocument.getState().revertToBaseline();
     useScene.getState().select(null);
   };
 

@@ -1,8 +1,9 @@
-import { loadApartmentFromPlan } from '../floorplan';
+import { buildApartment } from '../floorplan';
+import { E2_ANNOTATIONS } from '../floorplan/fixtures/e2/annotations';
 import type { Apartment, Floor, Room } from '../domain/types';
 
-/** The real E2 plan, reconstructed. Tests use the same pipeline as the app. */
-export const e2 = (): Apartment => loadApartmentFromPlan();
+/** The real E2 plan, built through the same generic pipeline the app uses. */
+export const e2 = (): Apartment => buildApartment(E2_ANNOTATIONS).apartment;
 export const e2Floor = (): Floor => e2().floors[0]!;
 
 export const room = (floor: Floor, id: string): Room => {

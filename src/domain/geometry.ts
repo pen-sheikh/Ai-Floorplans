@@ -295,3 +295,99 @@ export function polygonEdges(poly: readonly Vec2[]): { a: Vec2; b: Vec2; length:
     return { a, b, length: distance(a, b), inward: ccw ? left : scale(left, -1) };
   });
 }
+
+/** True if the polygon is convex (collinear vertices allowed). */
+export function isConvex(poly: readonly Vec2[]): boolean {
+  let sign = 0;
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]!;
+    const b = poly[(i + 1) % poly.length]!;
+    const c = poly[(i + 2) % poly.length]!;
+    const z = cross(sub(b, a), sub(c, b));
+    if (Math.abs(z) < 1e-12) continue;
+    if (sign === 0) sign = Math.sign(z);
+    else if (Math.sign(z) !== sign) return false;
+  }
+  return true;
+}
+
+/** Ear-clipping triangulation of a simple polygon (any winding, concave allowed). */
+export function triangulate(poly: readonly Vec2[]): Vec2[][] {
+  const pts = signedArea(poly) > 0 ? [...poly] : [...poly].reverse();
+  const tris: Vec2[][] = [];
+  const idx = pts.map((_, i) => i);
+  let guard = 0;
+  while (idx.length > 3 && guard++ < 10_000) {
+    let clipped = false;
+    for (let k = 0; k < idx.length; k++) {
+      const a = pts[idx[(k + idx.length - 1) % idx.length]!]!;
+      const b = pts[idx[k]!]!;
+      const c = pts[idx[(k + 1) % idx.length]!]!;
+      if (cross(sub(b, a), sub(c, b)) <= 1e-12) continue; // reflex or degenerate
+      const tri = [a, b, c];
+      const containsOther = idx.some((j) => {
+        const p = pts[j]!;
+        return p !== a && p !== b && p !== c && pointStrictlyInPolygon(p, tri, 1e-9);
+      });
+      if (containsOther) continue;
+      tris.push(tri);
+      idx.splice(k, 1);
+      clipped = true;
+      break;
+    }
+    if (!clipped) break; // numerically degenerate input: fall back to a fan below
+  }
+  if (idx.length === 3) tris.push(idx.map((i) => pts[i]!));
+  else if (idx.length > 3)
+    for (let k = 1; k < idx.length - 1; k++) tris.push([pts[idx[0]!]!, pts[idx[k]!]!, pts[idx[k + 1]!]!]);
+  return tris;
+}
+
+const convexPartsCache = new WeakMap<readonly Vec2[], Vec2[][]>();
+
+/** Convex pieces of a polygon (itself if convex), cached per polygon instance. */
+export function convexParts(poly: readonly Vec2[]): Vec2[][] {
+  let parts = convexPartsCache.get(poly);
+  if (!parts) {
+    parts = isConvex(poly) ? [[...poly]] : triangulate(poly);
+    convexPartsCache.set(poly, parts);
+  }
+  return parts;
+}
+
+/**
+ * Penetration depth between two simple polygons (concave allowed): the largest SAT depth over
+ * their convex pieces. ≤ 0 means separated or touching.
+ */
+export function polygonOverlapDepth(a: readonly Vec2[], b: readonly Vec2[]): number {
+  let best = -Infinity;
+  for (const pa of convexParts(a))
+    for (const pb of convexParts(b)) best = Math.max(best, convexOverlapDepth(pa, pb));
+  return best;
+}
+
+/** Distance to the nearest point on the polygon boundary. */
+export function distanceToBoundary(p: Vec2, poly: readonly Vec2[]): number {
+  let best = Infinity;
+  for (let i = 0; i < poly.length; i++)
+    best = Math.min(best, pointSegmentDistance(p, poly[i]!, poly[(i + 1) % poly.length]!));
+  return best;
+}
+
+/**
+ * How far `inner` sticks out of `outer`, in metres (0 if contained): the largest distance to
+ * the boundary among points of `inner` that lie outside, sampled every `step` along its edges.
+ */
+export function protrusion(outer: readonly Vec2[], inner: readonly Vec2[], step = 0.05): number {
+  let worst = 0;
+  for (let i = 0; i < inner.length; i++) {
+    const a = inner[i]!;
+    const b = inner[(i + 1) % inner.length]!;
+    const n = Math.max(1, Math.ceil(distance(a, b) / step));
+    for (let k = 0; k <= n; k++) {
+      const p = add(a, scale(sub(b, a), k / n));
+      if (!pointInPolygon(p, outer)) worst = Math.max(worst, distanceToBoundary(p, outer));
+    }
+  }
+  return worst;
+}

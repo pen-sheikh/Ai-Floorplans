@@ -75,3 +75,40 @@ describe('document store (undo/redo)', () => {
     expect(store.getState().dirty).toBe(false);
   });
 });
+
+describe('document store baseline (Cancel)', () => {
+  it('reverts unsaved edits to the last loaded/saved project', () => {
+    const store = createDocumentStore(e2());
+    store.getState().dispatch({ type: 'furniture/add', item });
+    store.getState().markSaved();
+    store
+      .getState()
+      .dispatch({ type: 'room/renovate', roomId: 'hall', patch: { floorMaterialId: 'floor-stone' } });
+    store.getState().revertToBaseline();
+    const s = store.getState();
+    expect(furniture(s)).toHaveLength(1); // saved state kept
+    expect(s.apartment.floors[0]!.rooms.find((r) => r.id === 'hall')!.renovation.floorMaterialId).not.toBe(
+      'floor-stone',
+    );
+    expect(s.dirty).toBe(false);
+    expect(s.past).toHaveLength(0);
+  });
+
+  it('undo/redo restore the snapshot validation instead of recomputing it', () => {
+    const store = createDocumentStore(e2());
+    const before = store.getState().validation;
+    store.getState().dispatch({ type: 'furniture/add', item });
+    store.getState().undo();
+    expect(store.getState().validation).toBe(before);
+  });
+
+  it('marks user-entered measurements as user-sourced', () => {
+    const store = createDocumentStore(e2());
+    store.getState().dispatch({ type: 'window/update', id: 'win-bed1', patch: { sillHeight: 0.8 } });
+    expect(store.getState().apartment.floors[0]!.windows.find((w) => w.id === 'win-bed1')!.sources).toEqual({
+      geometry: 'plan-geometry',
+      sillHeight: 'user',
+      height: 'assumed',
+    });
+  });
+});

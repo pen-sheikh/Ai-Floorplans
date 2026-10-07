@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { applyCommand } from '../editor/commands';
 import { e2 } from '../test/fixtures';
@@ -72,5 +74,47 @@ describe('project serialization', () => {
       expect(e).toBeInstanceOf(ProjectLoadError);
       expect((e as ProjectLoadError).issues.some((i) => i.code === 'wall-thickness')).toBe(true);
     }
+  });
+});
+
+describe('v1 → v2 migration (real v1 save file)', () => {
+  const v1 = readFileSync(resolve(__dirname, '__fixtures__/project-v1.json'), 'utf8');
+
+  it('loads a project saved by the v1 app and upgrades it', () => {
+    expect(JSON.parse(v1).schemaVersion).toBe(1);
+    const { apartment, migratedFrom } = deserializeProject(v1);
+    expect(migratedFrom).toBe(1);
+    expect(apartment.schemaVersion).toBe(SCHEMA_VERSION);
+    const f = apartment.floors[0]!;
+    // Geometry provenance kept; heights — always defaults in v1 — become explicit assumptions.
+    expect(f.walls[0]!.sources).toEqual({ geometry: 'plan-geometry', height: 'assumed' });
+    expect(f.windows[0]!.sources).toEqual({
+      geometry: 'plan-geometry',
+      sillHeight: 'assumed',
+      height: 'assumed',
+    });
+    expect(f.rooms[0]!.sources).toEqual({ geometry: 'plan-geometry', ceilingHeight: 'assumed' });
+    expect(f.fixtures.find((x) => x.id === 'fx-builtin-kitchen')!.sources.footprint).toBe('inferred');
+    expect(f.heightSource).toBe('assumed');
+    expect(apartment.coordinateSystem.plan!.calibration.confidence).toBe('high');
+    expect(f.walls.some((w) => 'source' in w)).toBe(false);
+  });
+
+  it('preserves user edits (furniture, renovation) through migration', () => {
+    const f = deserializeProject(v1).apartment.floors[0]!;
+    expect(f.furniture).toHaveLength(1);
+    expect(f.furniture[0]).toMatchObject({ id: 'furniture-v1-sofa', rotation: -Math.PI / 2 });
+    expect(f.rooms.find((r) => r.id === 'bedroom-1')!.renovation).toMatchObject({
+      floorMaterialId: 'floor-walnut',
+      wallColor: '#e3d5bf',
+    });
+  });
+
+  it('migrated v1 geometry equals a fresh v2 reconstruction', () => {
+    const migrated = deserializeProject(v1).apartment.floors[0]!;
+    const fresh = e2().floors[0]!;
+    expect(migrated.walls).toEqual(fresh.walls);
+    expect(migrated.doors).toEqual(fresh.doors);
+    expect(migrated.rooms.map((r) => r.polygon)).toEqual(fresh.rooms.map((r) => r.polygon));
   });
 });

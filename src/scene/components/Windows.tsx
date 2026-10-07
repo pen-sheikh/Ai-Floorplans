@@ -1,6 +1,6 @@
 import { Edges } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
-import { memo } from 'react';
+import { memo, useMemo } from 'react';
 import { pointAlongWall } from '../../domain/geometry';
 import type { Wall, Window } from '../../domain/types';
 import { selectFloor, useDocument } from '../../state/documentStore';
@@ -13,12 +13,13 @@ const F = 0.05;
 const DEPTH = 0.08;
 
 export function Windows() {
-  const floor = useDocument(selectFloor);
+  const windows = useDocument((s) => selectFloor(s).windows);
+  const walls = useDocument((s) => selectFloor(s).walls);
   const selected = useScene((s) => (s.selection?.kind === 'window' ? s.selection.id : null));
-  const wallById = new Map(floor.walls.map((w) => [w.id, w]));
+  const wallById = useMemo(() => new Map(walls.map((w) => [w.id, w])), [walls]);
   return (
     <group name="windows">
-      {floor.windows.map((win) => {
+      {windows.map((win) => {
         const wall = wallById.get(win.wallId);
         return wall ? <WindowMesh key={win.id} win={win} wall={wall} selected={selected === win.id} /> : null;
       })}

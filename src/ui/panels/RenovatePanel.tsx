@@ -129,6 +129,12 @@ export function RoomFinishes({
       {!compact && (
         <>
           <MaterialPicker
+            label="Trim (door frames)"
+            use="trim"
+            value={r.trimMaterialId}
+            onChange={(id) => set({ trimMaterialId: id })}
+          />
+          <MaterialPicker
             label={`Doors (${room.doorIds.length})`}
             use="door"
             value={r.doorMaterialId}

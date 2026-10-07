@@ -1,0 +1,1647 @@
+{
+  "format": "ai-floorplans/apartment-project",
+  "schemaVersion": 1,
+  "savedAt": "2026-10-07T08:00:00.000Z",
+  "apartment": {
+    "schemaVersion": 1,
+    "id": "packenham-house-e2",
+    "metadata": {
+      "name": "Packenham House — Third Floor",
+      "building": "Packenham House",
+      "floorLabel": "Third Floor",
+      "reportedAreaM2": {
+        "value": 57.4,
+        "note": "Printed on plan: \"Approx. 57.4 sq. metres (617.8 sq. feet) (excluding Balcony)\""
+      },
+      "assumptions": [
+        {
+          "id": "ceiling-height",
+          "description": "Floor-to-ceiling height (not shown on plan)",
+          "value": 2.4,
+          "unit": "m",
+          "source": "assumed"
+        },
+        {
+          "id": "door-height",
+          "description": "Door height (not shown on plan)",
+          "value": 2,
+          "unit": "m",
+          "source": "assumed"
+        },
+        {
+          "id": "railing-height",
+          "description": "Balcony balustrade height (not shown on plan)",
+          "value": 1.1,
+          "unit": "m",
+          "source": "assumed"
+        },
+        {
+          "id": "window-heights",
+          "description": "Window sill–head heights (not shown on plan)",
+          "value": "0.9–2.1 m, 1.05–2.1 m",
+          "source": "assumed"
+        },
+        {
+          "id": "fixture-heights",
+          "description": "Fixture heights (bath, WC, basin, counters) are typical values, not from the plan",
+          "value": "typical",
+          "source": "assumed"
+        }
+      ],
+      "notes": [
+        {
+          "code": "scale-calibrated",
+          "severity": "info",
+          "message": "Scale 88.15 px/m from 7 printed dimensions (max deviation 0.6 %)."
+        },
+        {
+          "code": "dimension-label-mismatch",
+          "severity": "warning",
+          "entityId": "bedroom-2",
+          "message": "Printed 2.61 m does not match the drawing (≈2.82 m at the calibrated scale, 8 %). Geometry kept as drawn; label excluded from calibration."
+        },
+        {
+          "code": "wall-note",
+          "severity": "info",
+          "entityId": "w-ext-south-hall",
+          "message": "Entrance wall to the communal corridor (drawn at external-wall thickness)."
+        },
+        {
+          "code": "wall-note",
+          "severity": "info",
+          "entityId": "w-nib-kitchen",
+          "message": "Full-thickness nib projecting ≈1 m into the open-plan room."
+        },
+        {
+          "code": "wall-note",
+          "severity": "info",
+          "entityId": "w-int-cupboard-front",
+          "message": "Not drawn solid on the plan: only door jambs and bifold leaves are drawn. Modelled as a frame."
+        },
+        {
+          "code": "door-note",
+          "severity": "info",
+          "entityId": "d-kitchen",
+          "message": "Gap in the partition with no door leaf drawn."
+        },
+        {
+          "code": "door-note",
+          "severity": "info",
+          "entityId": "d-balcony",
+          "message": "The plan draws the wall fill continuously across this door; the opening is taken from the jambs and swing arc."
+        },
+        {
+          "code": "room-label-inferred",
+          "severity": "info",
+          "entityId": "wardrobe-bed2",
+          "message": "Unlabelled enclosed space with double doors opening into Bedroom 2."
+        },
+        {
+          "code": "room-label-inferred",
+          "severity": "info",
+          "entityId": "cupboard-hall-north",
+          "message": "Unlabelled enclosed space with a door opening into the hall."
+        },
+        {
+          "code": "room-label-inferred",
+          "severity": "info",
+          "entityId": "cupboard-airing",
+          "message": "Unlabelled cupboard with bifold doors; commonly an airing cupboard, but the plan does not say."
+        },
+        {
+          "code": "room-label-inferred",
+          "severity": "info",
+          "entityId": "cupboard-hall-south",
+          "message": "Unlabelled cupboard with a narrow door opening into the hall."
+        },
+        {
+          "code": "fixture-uncertain",
+          "severity": "info",
+          "entityId": "fx-builtin-kitchen",
+          "message": "Drawn only as a thin outline (≈0.34 × 1.89 m). Its purpose and height are not on the plan."
+        },
+        {
+          "code": "drawing-balcony-door-fill",
+          "severity": "info",
+          "message": "Wall fill is drawn continuously across the balcony door; the opening is inferred from jambs and the swing arc."
+        },
+        {
+          "code": "drawing-kitchen-window-fill",
+          "severity": "info",
+          "message": "The kitchen window onto the balcony is drawn in the inner half of the wall only; the balcony-side half is filled."
+        },
+        {
+          "code": "area-cross-check",
+          "severity": "info",
+          "message": "Internal envelope ≈59.3 m² vs 57.4 m² printed (+3.3 %)."
+        }
+      ]
+    },
+    "coordinateSystem": {
+      "units": "meters",
+      "up": "Y",
+      "plan": {
+        "image": {
+          "file": "floor-plans/E2-floorplan.jpg",
+          "widthPx": 1485,
+          "heightPx": 1080
+        },
+        "originPx": {
+          "x": 237,
+          "y": 118
+        },
+        "calibration": {
+          "pixelsPerMeter": 88.15251812306346,
+          "method": "dimension-labels",
+          "samples": [
+            {
+              "roomId": "bedroom-1",
+              "labelMeters": 3.84,
+              "measuredPx": 339,
+              "pixelsPerMeter": 88.28125,
+              "residual": 0.0014603312494923064,
+              "accepted": true
+            },
+            {
+              "roomId": "bedroom-1",
+              "labelMeters": 2.66,
+              "measuredPx": 235,
+              "pixelsPerMeter": 88.34586466165413,
+              "residual": 0.00219331838394857,
+              "accepted": true
+            },
+            {
+              "roomId": "bedroom-2",
+              "labelMeters": 3.08,
+              "measuredPx": 272,
+              "pixelsPerMeter": 88.31168831168831,
+              "residual": 0.0018056227095253918,
+              "accepted": true
+            },
+            {
+              "roomId": "bedroom-2",
+              "labelMeters": 2.61,
+              "measuredPx": 249,
+              "pixelsPerMeter": 95.40229885057472,
+              "residual": 0.08224133447203799,
+              "accepted": false
+            },
+            {
+              "roomId": "bathroom",
+              "labelMeters": 1.7,
+              "measuredPx": 149,
+              "pixelsPerMeter": 87.64705882352942,
+              "residual": -0.005733917876610327,
+              "accepted": true
+            },
+            {
+              "roomId": "bathroom",
+              "labelMeters": 2.31,
+              "measuredPx": 204,
+              "pixelsPerMeter": 88.31168831168831,
+              "residual": 0.0018056227095254397,
+              "accepted": true
+            },
+            {
+              "roomId": "kitchen-living",
+              "labelMeters": 6.39,
+              "measuredPx": 563,
+              "pixelsPerMeter": 88.10641627543036,
+              "residual": -0.0005229782269943662,
+              "accepted": true
+            },
+            {
+              "roomId": "kitchen-living",
+              "labelMeters": 3.77,
+              "measuredPx": 332,
+              "pixelsPerMeter": 88.06366047745358,
+              "residual": -0.001007998948887943,
+              "accepted": true
+            }
+          ],
+          "maxResidual": 0.005733917876610327
+        }
+      },
+      "north": {
+        "x": 0.9165393783696334,
+        "z": 0.39994445601584006,
+        "source": "plan-geometry"
+      }
+    },
+    "floors": [
+      {
+        "id": "packenham-house-e2-floor-3",
+        "name": "Third Floor",
+        "level": 3,
+        "elevation": 0,
+        "height": 2.4,
+        "footprint": [
+          {
+            "x": 0,
+            "z": 0
+          },
+          {
+            "x": 6.000963004386338,
+            "z": 0
+          },
+          {
+            "x": 6.000963004386338,
+            "z": 1.3385891011674629
+          },
+          {
+            "x": 9.869258627251634,
+            "z": 1.3385891011674629
+          },
+          {
+            "x": 9.869258627251634,
+            "z": 8.13363038590738
+          },
+          {
+            "x": 5.694675667678529,
+            "z": 8.13363038590738
+          },
+          {
+            "x": 5.694675667678529,
+            "z": 5.887523250050112
+          },
+          {
+            "x": 2.722554104069416,
+            "z": 5.887523250050112
+          },
+          {
+            "x": 2.722554104069416,
+            "z": 7.679871368562478
+          },
+          {
+            "x": 0,
+            "z": 7.679871368562478
+          }
+        ],
+        "rooms": [
+          {
+            "id": "bedroom-1",
+            "name": "Bedroom 1",
+            "type": "bedroom",
+            "labelSource": "plan-label",
+            "planLabel": {
+              "text": "Bedroom",
+              "dimensionsText": "3.84m x 2.66m (12'7\" x 8'9\")",
+              "dimensions": [3.84, 2.66]
+            },
+            "polygon": [
+              {
+                "x": 0.2041915578052062,
+                "z": 0.2041915578052062
+              },
+              {
+                "x": 2.8700257847065096,
+                "z": 0.2041915578052062
+              },
+              {
+                "x": 2.8700257847065096,
+                "z": 4.049799229803257
+              },
+              {
+                "x": 0.2041915578052062,
+                "z": 4.049799229803257
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": false,
+            "wallIds": ["w-ext-north", "w-ext-west", "w-int-bed1-bed2", "w-int-hall-north"],
+            "doorIds": ["d-bed1"],
+            "windowIds": ["win-bed1"],
+            "renovation": {
+              "wallMaterialId": "paint-white",
+              "floorMaterialId": "floor-walnut",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "warm",
+              "wallColor": "#e3d5bf"
+            }
+          },
+          {
+            "id": "bedroom-2",
+            "name": "Bedroom 2",
+            "type": "bedroom",
+            "labelSource": "plan-label",
+            "planLabel": {
+              "text": "Bedroom",
+              "dimensionsText": "3.08m x 2.61m (10'1\" x 8'7\")",
+              "dimensions": [3.08, 2.61]
+            },
+            "polygon": [
+              {
+                "x": 2.9721215636091127,
+                "z": 0.2041915578052062
+              },
+              {
+                "x": 5.796771446581132,
+                "z": 0.2041915578052062
+              },
+              {
+                "x": 5.796771446581132,
+                "z": 3.2897528757505445
+              },
+              {
+                "x": 3.8569516474316727,
+                "z": 3.2897528757505445
+              },
+              {
+                "x": 3.8569516474316727,
+                "z": 4.049799229803257
+              },
+              {
+                "x": 2.9721215636091127,
+                "z": 4.049799229803257
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": false,
+            "wallIds": [
+              "w-ext-north",
+              "w-ext-east-bed2",
+              "w-int-bed1-bed2",
+              "w-int-hall-north",
+              "w-int-bed2-south",
+              "w-int-wardrobe-west",
+              "w-int-kitchen-hall"
+            ],
+            "doorIds": ["d-bed2", "d-wardrobe"],
+            "windowIds": ["win-bed2"],
+            "renovation": {
+              "wallMaterialId": "paint-white",
+              "floorMaterialId": "floor-carpet",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "warm"
+            }
+          },
+          {
+            "id": "wardrobe-bed2",
+            "name": "Built-in wardrobe",
+            "type": "storage",
+            "labelSource": "inferred",
+            "polygon": [
+              {
+                "x": 3.959047426334276,
+                "z": 3.3918486546531477
+              },
+              {
+                "x": 4.968661239926685,
+                "z": 3.3918486546531477
+              },
+              {
+                "x": 4.968661239926685,
+                "z": 4.049799229803257
+              },
+              {
+                "x": 3.959047426334276,
+                "z": 4.049799229803257
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": false,
+            "wallIds": ["w-int-hall-north", "w-int-bed2-south", "w-int-wardrobe-west", "w-int-wardrobe-east"],
+            "doorIds": ["d-wardrobe"],
+            "windowIds": [],
+            "renovation": {
+              "wallMaterialId": "paint-white",
+              "floorMaterialId": "floor-carpet-gray",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "off"
+            }
+          },
+          {
+            "id": "cupboard-hall-north",
+            "name": "Hall cupboard",
+            "type": "storage",
+            "labelSource": "inferred",
+            "polygon": [
+              {
+                "x": 5.070757018829288,
+                "z": 3.3918486546531477
+              },
+              {
+                "x": 5.796771446581132,
+                "z": 3.3918486546531477
+              },
+              {
+                "x": 5.796771446581132,
+                "z": 4.049799229803257
+              },
+              {
+                "x": 5.070757018829288,
+                "z": 4.049799229803257
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": false,
+            "wallIds": ["w-int-hall-north", "w-int-bed2-south", "w-int-wardrobe-east", "w-int-kitchen-hall"],
+            "doorIds": ["d-cupboard-c"],
+            "windowIds": [],
+            "renovation": {
+              "wallMaterialId": "paint-white",
+              "floorMaterialId": "floor-carpet-gray",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "off"
+            }
+          },
+          {
+            "id": "hall",
+            "name": "Hall",
+            "type": "hall",
+            "labelSource": "plan-label",
+            "planLabel": {
+              "text": "Hall"
+            },
+            "polygon": [
+              {
+                "x": 0.2041915578052062,
+                "z": 4.15189500870586
+              },
+              {
+                "x": 5.796771446581132,
+                "z": 4.15189500870586
+              },
+              {
+                "x": 5.796771446581132,
+                "z": 5.683331692244906
+              },
+              {
+                "x": 3.641416114192844,
+                "z": 5.683331692244906
+              },
+              {
+                "x": 3.641416114192844,
+                "z": 5.025381117094797
+              },
+              {
+                "x": 1.7583161922114978,
+                "z": 5.025381117094797
+              },
+              {
+                "x": 1.7583161922114978,
+                "z": 5.683331692244906
+              },
+              {
+                "x": 0.2041915578052062,
+                "z": 5.683331692244906
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": false,
+            "wallIds": [
+              "w-ext-west",
+              "w-ext-south-hall",
+              "w-int-hall-north",
+              "w-int-kitchen-hall",
+              "w-int-bath-north",
+              "w-int-cupboard-top",
+              "w-int-cupboard-east",
+              "w-int-cupboard-front"
+            ],
+            "doorIds": [
+              "d-front",
+              "d-bed1",
+              "d-bed2",
+              "d-cupboard-c",
+              "d-kitchen",
+              "d-bathroom",
+              "d-cupboard-b",
+              "d-cupboard-a"
+            ],
+            "windowIds": [],
+            "renovation": {
+              "wallMaterialId": "paint-white",
+              "floorMaterialId": "floor-oak",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "neutral"
+            }
+          },
+          {
+            "id": "cupboard-airing",
+            "name": "Cupboard (bifold)",
+            "type": "storage",
+            "labelSource": "inferred",
+            "polygon": [
+              {
+                "x": 1.860411971114101,
+                "z": 5.1274768959974
+              },
+              {
+                "x": 2.51836254626421,
+                "z": 5.1274768959974
+              },
+              {
+                "x": 2.51836254626421,
+                "z": 5.683331692244906
+              },
+              {
+                "x": 1.860411971114101,
+                "z": 5.683331692244906
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": false,
+            "wallIds": [
+              "w-int-bath-north",
+              "w-int-cupboard-top",
+              "w-int-cupboard-divider",
+              "w-int-cupboard-front"
+            ],
+            "doorIds": ["d-cupboard-a"],
+            "windowIds": [],
+            "renovation": {
+              "wallMaterialId": "paint-white",
+              "floorMaterialId": "floor-carpet-gray",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "off"
+            }
+          },
+          {
+            "id": "cupboard-hall-south",
+            "name": "Hall cupboard (small)",
+            "type": "storage",
+            "labelSource": "inferred",
+            "polygon": [
+              {
+                "x": 2.620458325166813,
+                "z": 5.1274768959974
+              },
+              {
+                "x": 3.539320335290241,
+                "z": 5.1274768959974
+              },
+              {
+                "x": 3.539320335290241,
+                "z": 5.683331692244906
+              },
+              {
+                "x": 2.620458325166813,
+                "z": 5.683331692244906
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": false,
+            "wallIds": [
+              "w-ext-south-hall",
+              "w-int-cupboard-top",
+              "w-int-cupboard-divider",
+              "w-int-cupboard-east"
+            ],
+            "doorIds": ["d-cupboard-b"],
+            "windowIds": [],
+            "renovation": {
+              "wallMaterialId": "paint-white",
+              "floorMaterialId": "floor-carpet-gray",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "off"
+            }
+          },
+          {
+            "id": "bathroom",
+            "name": "Bathroom",
+            "type": "bathroom",
+            "labelSource": "plan-label",
+            "planLabel": {
+              "text": "Bathroom",
+              "dimensionsText": "1.70m x 2.31m (5'7\" x 7'7\")",
+              "dimensions": [1.7, 2.31]
+            },
+            "polygon": [
+              {
+                "x": 0.2041915578052062,
+                "z": 5.785427471147509
+              },
+              {
+                "x": 2.51836254626421,
+                "z": 5.785427471147509
+              },
+              {
+                "x": 2.51836254626421,
+                "z": 7.4756798107572715
+              },
+              {
+                "x": 0.2041915578052062,
+                "z": 7.4756798107572715
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": false,
+            "wallIds": ["w-ext-west", "w-ext-south-bath", "w-ext-east-bath", "w-int-bath-north"],
+            "doorIds": ["d-bathroom"],
+            "windowIds": [],
+            "renovation": {
+              "wallMaterialId": "wall-tile-ceramic",
+              "floorMaterialId": "floor-bath-tile",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "cool"
+            }
+          },
+          {
+            "id": "kitchen-living",
+            "name": "Kitchen/Lounge/Diner",
+            "type": "kitchen-living",
+            "labelSource": "plan-label",
+            "planLabel": {
+              "text": "Kitchen/Lounge/Diner",
+              "dimensionsText": "6.39m x 3.77m (20'11\" x 12'4\")",
+              "dimensions": [6.39, 3.77]
+            },
+            "polygon": [
+              {
+                "x": 5.898867225483735,
+                "z": 1.5427806589726691
+              },
+              {
+                "x": 9.665067069446428,
+                "z": 1.5427806589726691
+              },
+              {
+                "x": 9.665067069446428,
+                "z": 7.929438828102175
+              },
+              {
+                "x": 5.898867225483735,
+                "z": 7.929438828102175
+              },
+              {
+                "x": 5.898867225483735,
+                "z": 5.887523250050112
+              },
+              {
+                "x": 6.89713706364252,
+                "z": 5.887523250050112
+              },
+              {
+                "x": 6.89713706364252,
+                "z": 5.683331692244906
+              },
+              {
+                "x": 5.898867225483735,
+                "z": 5.683331692244906
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": false,
+            "wallIds": [
+              "w-ext-north-kitchen",
+              "w-ext-east",
+              "w-ext-south-kitchen",
+              "w-ext-west-kitchen",
+              "w-nib-kitchen",
+              "w-int-kitchen-hall"
+            ],
+            "doorIds": ["d-kitchen", "d-balcony"],
+            "windowIds": ["win-kitchen-north", "win-kitchen-east"],
+            "renovation": {
+              "wallMaterialId": "paint-white",
+              "floorMaterialId": "floor-oak",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "neutral"
+            }
+          },
+          {
+            "id": "balcony",
+            "name": "Balcony",
+            "type": "balcony",
+            "labelSource": "plan-label",
+            "planLabel": {
+              "text": "Balcony"
+            },
+            "polygon": [
+              {
+                "x": 6.000963004386338,
+                "z": 0.21553553323882876
+              },
+              {
+                "x": 9.653723094012804,
+                "z": 0.21553553323882876
+              },
+              {
+                "x": 9.653723094012804,
+                "z": 1.3385891011674629
+              },
+              {
+                "x": 6.000963004386338,
+                "z": 1.3385891011674629
+              }
+            ],
+            "ceilingHeight": 2.4,
+            "exterior": true,
+            "wallIds": ["w-ext-east-bed2", "w-ext-north-kitchen", "w-rail-north", "w-rail-east"],
+            "doorIds": ["d-balcony"],
+            "windowIds": ["win-kitchen-north"],
+            "renovation": {
+              "wallMaterialId": "exterior-render",
+              "floorMaterialId": "floor-decking",
+              "ceilingMaterialId": "ceiling-white",
+              "trimMaterialId": "wood-white",
+              "doorMaterialId": "wood-white",
+              "windowMaterialId": "upvc-white",
+              "lighting": "off"
+            }
+          }
+        ],
+        "walls": [
+          {
+            "id": "w-ext-north",
+            "start": {
+              "x": 0,
+              "z": 0.1020957789026031
+            },
+            "end": {
+              "x": 6.000963004386338,
+              "z": 0.1020957789026031
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-ext-west",
+            "start": {
+              "x": 0.1020957789026031,
+              "z": 0
+            },
+            "end": {
+              "x": 0.1020957789026031,
+              "z": 7.679871368562478
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-ext-south-bath",
+            "start": {
+              "x": 0,
+              "z": 7.577775589659875
+            },
+            "end": {
+              "x": 2.722554104069416,
+              "z": 7.577775589659875
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-ext-east-bath",
+            "start": {
+              "x": 2.620458325166813,
+              "z": 5.683331692244906
+            },
+            "end": {
+              "x": 2.620458325166813,
+              "z": 7.679871368562478
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-ext-south-hall",
+            "start": {
+              "x": 2.51836254626421,
+              "z": 5.785427471147509
+            },
+            "end": {
+              "x": 5.898867225483735,
+              "z": 5.785427471147509
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-ext-east-bed2",
+            "start": {
+              "x": 5.898867225483735,
+              "z": 0
+            },
+            "end": {
+              "x": 5.898867225483735,
+              "z": 1.5427806589726691
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-ext-north-kitchen",
+            "start": {
+              "x": 6.000963004386338,
+              "z": 1.440684880070066
+            },
+            "end": {
+              "x": 9.869258627251634,
+              "z": 1.440684880070066
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-ext-east",
+            "start": {
+              "x": 9.767162848349031,
+              "z": 1.3385891011674629
+            },
+            "end": {
+              "x": 9.767162848349031,
+              "z": 8.13363038590738
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-ext-south-kitchen",
+            "start": {
+              "x": 5.694675667678529,
+              "z": 8.031534607004778
+            },
+            "end": {
+              "x": 9.869258627251634,
+              "z": 8.031534607004778
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-ext-west-kitchen",
+            "start": {
+              "x": 5.796771446581132,
+              "z": 5.683331692244906
+            },
+            "end": {
+              "x": 5.796771446581132,
+              "z": 8.13363038590738
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "exterior",
+            "materialId": "exterior-render",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-nib-kitchen",
+            "start": {
+              "x": 5.898867225483735,
+              "z": 5.785427471147509
+            },
+            "end": {
+              "x": 6.89713706364252,
+              "z": 5.785427471147509
+            },
+            "thickness": 0.2041915578052062,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-bed1-bed2",
+            "start": {
+              "x": 2.921073674157811,
+              "z": 0.2041915578052062
+            },
+            "end": {
+              "x": 2.921073674157811,
+              "z": 4.049799229803257
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-hall-north",
+            "start": {
+              "x": 0.2041915578052062,
+              "z": 4.100847119254558
+            },
+            "end": {
+              "x": 5.796771446581132,
+              "z": 4.100847119254558
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-bed2-south",
+            "start": {
+              "x": 3.8569516474316727,
+              "z": 3.340800765201846
+            },
+            "end": {
+              "x": 5.796771446581132,
+              "z": 3.340800765201846
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-wardrobe-west",
+            "start": {
+              "x": 3.9079995368829743,
+              "z": 3.3918486546531477
+            },
+            "end": {
+              "x": 3.9079995368829743,
+              "z": 4.049799229803257
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-wardrobe-east",
+            "start": {
+              "x": 5.019709129377986,
+              "z": 3.3918486546531477
+            },
+            "end": {
+              "x": 5.019709129377986,
+              "z": 4.049799229803257
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-kitchen-hall",
+            "start": {
+              "x": 5.847819336032433,
+              "z": 1.5427806589726691
+            },
+            "end": {
+              "x": 5.847819336032433,
+              "z": 5.683331692244906
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-bath-north",
+            "start": {
+              "x": 0.2041915578052062,
+              "z": 5.734379581696207
+            },
+            "end": {
+              "x": 2.51836254626421,
+              "z": 5.734379581696207
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-cupboard-top",
+            "start": {
+              "x": 1.860411971114101,
+              "z": 5.076429006546099
+            },
+            "end": {
+              "x": 3.641416114192844,
+              "z": 5.076429006546099
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-cupboard-divider",
+            "start": {
+              "x": 2.5694104357155116,
+              "z": 5.1274768959974
+            },
+            "end": {
+              "x": 2.5694104357155116,
+              "z": 5.683331692244906
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-cupboard-east",
+            "start": {
+              "x": 3.5903682247415425,
+              "z": 5.1274768959974
+            },
+            "end": {
+              "x": 3.5903682247415425,
+              "z": 5.683331692244906
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-int-cupboard-front",
+            "start": {
+              "x": 1.8093640816627994,
+              "z": 5.025381117094797
+            },
+            "end": {
+              "x": 1.8093640816627994,
+              "z": 5.683331692244906
+            },
+            "thickness": 0.1020957789026031,
+            "height": 2.4,
+            "kind": "interior",
+            "materialId": "paint-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-rail-north",
+            "start": {
+              "x": 6.000963004386338,
+              "z": 0.15881565607071593
+            },
+            "end": {
+              "x": 9.767162848349031,
+              "z": 0.15881565607071593
+            },
+            "thickness": 0.11343975433622568,
+            "height": 1.1,
+            "kind": "railing",
+            "materialId": "railing-glass",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "w-rail-east",
+            "start": {
+              "x": 9.710442971180917,
+              "z": 0.21553553323882876
+            },
+            "end": {
+              "x": 9.710442971180917,
+              "z": 1.3385891011674629
+            },
+            "thickness": 0.11343975433622568,
+            "height": 1.1,
+            "kind": "railing",
+            "materialId": "railing-glass",
+            "source": "plan-geometry"
+          }
+        ],
+        "doors": [
+          {
+            "id": "d-front",
+            "wallId": "w-ext-south-hall",
+            "offset": 1.5711405975567256,
+            "width": 0.760046354052712,
+            "height": 2,
+            "kind": "hinged",
+            "hinge": "start",
+            "swingSide": -1,
+            "materialId": "wood-white",
+            "connects": ["hall", null],
+            "source": "plan-geometry",
+            "note": "Entrance door"
+          },
+          {
+            "id": "d-bed1",
+            "wallId": "w-int-hall-north",
+            "offset": 0.4537590173449027,
+            "width": 0.7487023786190894,
+            "height": 2,
+            "kind": "hinged",
+            "hinge": "start",
+            "swingSide": -1,
+            "materialId": "wood-white",
+            "connects": ["bedroom-1", "hall"],
+            "source": "plan-geometry"
+          },
+          {
+            "id": "d-bed2",
+            "wallId": "w-int-hall-north",
+            "offset": 3.2046730599983753,
+            "width": 0.7373584031854669,
+            "height": 2,
+            "kind": "hinged",
+            "hinge": "start",
+            "swingSide": -1,
+            "materialId": "wood-white",
+            "connects": ["bedroom-2", "hall"],
+            "source": "plan-geometry"
+          },
+          {
+            "id": "d-cupboard-c",
+            "wallId": "w-int-hall-north",
+            "offset": 5.223900687183193,
+            "width": 0.578542747114751,
+            "height": 2,
+            "kind": "hinged",
+            "hinge": "end",
+            "swingSide": 1,
+            "materialId": "wood-white",
+            "connects": ["cupboard-hall-north", "hall"],
+            "source": "plan-geometry"
+          },
+          {
+            "id": "d-wardrobe",
+            "wallId": "w-int-bed2-south",
+            "offset": 0.601230697981996,
+            "width": 0.862142132955315,
+            "height": 2,
+            "kind": "double",
+            "hinge": "start",
+            "swingSide": -1,
+            "materialId": "wood-white",
+            "connects": ["bedroom-2", "wardrobe-bed2"],
+            "source": "plan-geometry"
+          },
+          {
+            "id": "d-kitchen",
+            "wallId": "w-int-kitchen-hall",
+            "offset": 3.017497465343603,
+            "width": 0.7713903294863346,
+            "height": 2,
+            "kind": "opening",
+            "hinge": "start",
+            "swingSide": -1,
+            "materialId": "wood-white",
+            "connects": ["kitchen-living", "hall"],
+            "source": "plan-geometry",
+            "note": "Opening to kitchen/lounge"
+          },
+          {
+            "id": "d-bathroom",
+            "wallId": "w-int-bath-north",
+            "offset": 1.1514135065126905,
+            "width": 0.760046354052712,
+            "height": 2,
+            "kind": "hinged",
+            "hinge": "end",
+            "swingSide": -1,
+            "materialId": "wood-white",
+            "connects": ["hall", "bathroom"],
+            "source": "plan-geometry"
+          },
+          {
+            "id": "d-cupboard-b",
+            "wallId": "w-int-cupboard-top",
+            "offset": 1.276197236282539,
+            "width": 0.3970391401767899,
+            "height": 2,
+            "kind": "hinged",
+            "hinge": "start",
+            "swingSide": -1,
+            "materialId": "wood-white",
+            "connects": ["hall", "cupboard-hall-south"],
+            "source": "plan-geometry"
+          },
+          {
+            "id": "d-cupboard-a",
+            "wallId": "w-int-cupboard-front",
+            "offset": 0.3516632384422996,
+            "width": 0.4537590173449027,
+            "height": 2,
+            "kind": "bifold",
+            "hinge": "start",
+            "swingSide": -1,
+            "materialId": "wood-white",
+            "connects": ["cupboard-airing", "hall"],
+            "source": "plan-geometry"
+          },
+          {
+            "id": "d-balcony",
+            "wallId": "w-ext-north-kitchen",
+            "offset": 0.680638526017354,
+            "width": 0.7487023786190894,
+            "height": 2,
+            "kind": "hinged",
+            "hinge": "start",
+            "swingSide": -1,
+            "materialId": "wood-white",
+            "connects": ["balcony", "kitchen-living"],
+            "source": "plan-geometry",
+            "note": "Balcony door"
+          }
+        ],
+        "windows": [
+          {
+            "id": "win-bed1",
+            "wallId": "w-ext-north",
+            "offset": 1.5257646958222353,
+            "width": 1.599500536140782,
+            "height": 1.2000000000000002,
+            "sillHeight": 0.9,
+            "kind": "standard",
+            "materialId": "upvc-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "win-bed2",
+            "wallId": "w-ext-north",
+            "offset": 4.163238984139482,
+            "width": 1.7696601676451205,
+            "height": 1.2000000000000002,
+            "sillHeight": 0.9,
+            "kind": "standard",
+            "materialId": "upvc-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "win-kitchen-north",
+            "wallId": "w-ext-north-kitchen",
+            "offset": 2.404922791927984,
+            "width": 2.314170988459004,
+            "height": 1.2000000000000002,
+            "sillHeight": 0.9,
+            "kind": "large",
+            "materialId": "upvc-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "win-kitchen-east",
+            "wallId": "w-ext-east",
+            "offset": 5.291964539784927,
+            "width": 1.5314366835390465,
+            "height": 1.05,
+            "sillHeight": 1.05,
+            "kind": "standard",
+            "materialId": "upvc-white",
+            "source": "plan-geometry"
+          }
+        ],
+        "stairs": [],
+        "fixtures": [
+          {
+            "id": "fx-bath",
+            "roomId": "bathroom",
+            "kind": "bath",
+            "label": "Bath",
+            "footprint": [
+              {
+                "x": 1.8150360693796108,
+                "z": 5.808115422014755
+              },
+              {
+                "x": 2.461642669096097,
+                "z": 5.808115422014755
+              },
+              {
+                "x": 2.461642669096097,
+                "z": 7.4643358353236495
+              },
+              {
+                "x": 1.8150360693796108,
+                "z": 7.4643358353236495
+              }
+            ],
+            "height": 0.55,
+            "elevation": 0,
+            "materialId": "ceramic-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "fx-toilet",
+            "roomId": "bathroom",
+            "kind": "toilet",
+            "label": "WC",
+            "footprint": [
+              {
+                "x": 0.340319263008677,
+                "z": 6.829073211040785
+              },
+              {
+                "x": 0.8848300838225602,
+                "z": 6.829073211040785
+              },
+              {
+                "x": 0.8848300838225602,
+                "z": 7.4756798107572715
+              },
+              {
+                "x": 0.340319263008677,
+                "z": 7.4756798107572715
+              }
+            ],
+            "height": 0.75,
+            "elevation": 0,
+            "materialId": "ceramic-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "fx-basin",
+            "roomId": "bathroom",
+            "kind": "basin",
+            "label": "Basin",
+            "footprint": [
+              {
+                "x": 1.2478372976984824,
+                "z": 7.11267259688135
+              },
+              {
+                "x": 1.7696601676451205,
+                "z": 7.11267259688135
+              },
+              {
+                "x": 1.7696601676451205,
+                "z": 7.4756798107572715
+              },
+              {
+                "x": 1.2478372976984824,
+                "z": 7.4756798107572715
+              }
+            ],
+            "height": 0.85,
+            "elevation": 0,
+            "materialId": "ceramic-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "fx-counter-west",
+            "roomId": "kitchen-living",
+            "kind": "kitchen-counter",
+            "label": "Kitchen unit",
+            "footprint": [
+              {
+                "x": 5.898867225483735,
+                "z": 7.055952719713237
+              },
+              {
+                "x": 6.386658169129506,
+                "z": 7.055952719713237
+              },
+              {
+                "x": 6.386658169129506,
+                "z": 7.929438828102175
+              },
+              {
+                "x": 5.898867225483735,
+                "z": 7.929438828102175
+              }
+            ],
+            "height": 0.9,
+            "elevation": 0,
+            "materialId": "cabinet-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "fx-counter-south",
+            "roomId": "kitchen-living",
+            "kind": "kitchen-counter",
+            "label": "Kitchen counter",
+            "footprint": [
+              {
+                "x": 6.386658169129506,
+                "z": 7.430303909022782
+              },
+              {
+                "x": 9.165932150367034,
+                "z": 7.430303909022782
+              },
+              {
+                "x": 9.165932150367034,
+                "z": 7.929438828102175
+              },
+              {
+                "x": 6.386658169129506,
+                "z": 7.929438828102175
+              }
+            ],
+            "height": 0.9,
+            "elevation": 0,
+            "materialId": "cabinet-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "fx-counter-east",
+            "roomId": "kitchen-living",
+            "kind": "kitchen-counter",
+            "label": "Kitchen counter (sink run)",
+            "footprint": [
+              {
+                "x": 9.165932150367034,
+                "z": 6.148434685023432
+              },
+              {
+                "x": 9.665067069446428,
+                "z": 6.148434685023432
+              },
+              {
+                "x": 9.665067069446428,
+                "z": 7.929438828102175
+              },
+              {
+                "x": 9.165932150367034,
+                "z": 7.929438828102175
+              }
+            ],
+            "height": 0.9,
+            "elevation": 0,
+            "materialId": "cabinet-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "fx-counter-peninsula",
+            "roomId": "kitchen-living",
+            "kind": "kitchen-counter",
+            "label": "Kitchen peninsula",
+            "footprint": [
+              {
+                "x": 7.804655098332326,
+                "z": 5.637955790510416
+              },
+              {
+                "x": 9.665067069446428,
+                "z": 5.637955790510416
+              },
+              {
+                "x": 9.665067069446428,
+                "z": 6.148434685023432
+              },
+              {
+                "x": 7.804655098332326,
+                "z": 6.148434685023432
+              }
+            ],
+            "height": 0.9,
+            "elevation": 0,
+            "materialId": "cabinet-white",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "fx-sink",
+            "roomId": "kitchen-living",
+            "kind": "sink",
+            "label": "Sink & drainer",
+            "footprint": [
+              {
+                "x": 9.165932150367034,
+                "z": 6.000963004386338
+              },
+              {
+                "x": 9.665067069446428,
+                "z": 6.000963004386338
+              },
+              {
+                "x": 9.665067069446428,
+                "z": 6.999232842545124
+              },
+              {
+                "x": 9.165932150367034,
+                "z": 6.999232842545124
+              }
+            ],
+            "height": 0.02,
+            "elevation": 0.9,
+            "materialId": "steel",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "fx-hob",
+            "roomId": "kitchen-living",
+            "kind": "hob",
+            "label": "Hob",
+            "footprint": [
+              {
+                "x": 7.99750268070391,
+                "z": 7.452991859890027
+              },
+              {
+                "x": 8.507981575216926,
+                "z": 7.452991859890027
+              },
+              {
+                "x": 8.507981575216926,
+                "z": 7.929438828102175
+              },
+              {
+                "x": 7.99750268070391,
+                "z": 7.929438828102175
+              }
+            ],
+            "height": 0.02,
+            "elevation": 0.9,
+            "materialId": "hob-black",
+            "source": "plan-geometry"
+          },
+          {
+            "id": "fx-builtin-kitchen",
+            "roomId": "kitchen-living",
+            "kind": "built-in-unit",
+            "label": "Unlabelled built-in",
+            "footprint": [
+              {
+                "x": 5.898867225483735,
+                "z": 1.5427806589726691
+              },
+              {
+                "x": 6.239186488492412,
+                "z": 1.5427806589726691
+              },
+              {
+                "x": 6.239186488492412,
+                "z": 3.437224556387638
+              },
+              {
+                "x": 5.898867225483735,
+                "z": 3.437224556387638
+              }
+            ],
+            "height": 0.9,
+            "elevation": 0,
+            "materialId": "cabinet-white",
+            "source": "inferred",
+            "note": "Drawn only as a thin outline (≈0.34 × 1.89 m). Its purpose and height are not on the plan."
+          }
+        ],
+        "furniture": [
+          {
+            "id": "furniture-v1-sofa",
+            "catalogId": "sofa-3",
+            "name": "3-seat sofa",
+            "category": "sofa",
+            "roomId": "kitchen-living",
+            "position": {
+              "x": 9.3,
+              "z": 4.6
+            },
+            "elevation": 0,
+            "rotation": -1.5707963267948966,
+            "dimensions": {
+              "width": 2.2,
+              "depth": 0.9,
+              "height": 0.85
+            },
+            "materialId": "fabric-linen"
+          }
+        ]
+      }
+    ]
+  }
+}

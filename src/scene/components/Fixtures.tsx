@@ -1,6 +1,7 @@
 import { Edges } from '@react-three/drei';
 import type { ThreeEvent } from '@react-three/fiber';
-import { memo, useMemo } from 'react';
+import { memo, useEffect, useMemo } from 'react';
+import * as THREE from 'three';
 import type { Fixture } from '../../domain/types';
 import { selectFloor, useDocument } from '../../state/documentStore';
 import { useScene } from '../../state/sceneStore';
@@ -11,22 +12,64 @@ import { HIGHLIGHT } from '../sceneConstants';
 const WORKTOP = 0.04;
 
 export function Fixtures() {
-  const floor = useDocument(selectFloor);
+  const fixtures = useDocument((s) => selectFloor(s).fixtures);
+  const rooms = useDocument((s) => selectFloor(s).rooms);
   const selected = useScene((s) => (s.selection?.kind === 'fixture' ? s.selection.id : null));
-  const roomPolys = useMemo(() => new Map(floor.rooms.map((r) => [r.id, r.polygon])), [floor.rooms]);
+  const roomPolys = useMemo(() => new Map(rooms.map((r) => [r.id, r.polygon])), [rooms]);
   return (
     <group name="fixtures">
-      {floor.fixtures.map((fx) => (
-        <FixtureMesh
-          key={fx.id}
-          fx={fx}
-          roomPolygon={fx.roomId ? (roomPolys.get(fx.roomId) ?? null) : null}
-          selected={selected === fx.id}
-        />
-      ))}
+      {fixtures.map((fx) =>
+        isRectangle(fx.footprint) ? (
+          <FixtureMesh
+            key={fx.id}
+            fx={fx}
+            roomPolygon={fx.roomId ? (roomPolys.get(fx.roomId) ?? null) : null}
+            selected={selected === fx.id}
+          />
+        ) : (
+          <OutlineFixture key={fx.id} fx={fx} selected={selected === fx.id} />
+        ),
+      )}
     </group>
   );
 }
+
+/** Four corners with right angles: can be drawn as an oriented box with fixture detail. */
+function isRectangle(poly: Fixture['footprint']): boolean {
+  if (poly.length !== 4) return false;
+  return poly.every((p, i) => {
+    const a = poly[(i + 3) % 4]!;
+    const b = poly[(i + 1) % 4]!;
+    return Math.abs((a.x - p.x) * (b.x - p.x) + (a.z - p.z) * (b.z - p.z)) < 1e-6;
+  });
+}
+
+/** Any other outline (L-shaped counters, angled units): extruded to the fixture's height. */
+const OutlineFixture = memo(function OutlineFixture({ fx, selected }: { fx: Fixture; selected: boolean }) {
+  const select = useScene((s) => s.select);
+  const geo = useMemo(() => {
+    const shape = new THREE.Shape(fx.footprint.map((p) => new THREE.Vector2(p.x, -p.z)));
+    return new THREE.ExtrudeGeometry(shape, { depth: fx.height, bevelEnabled: false });
+  }, [fx.footprint, fx.height]);
+  useEffect(() => () => geo.dispose(), [geo]);
+  return (
+    <mesh
+      name={`fixture-${fx.id}`}
+      geometry={geo}
+      rotation={[-Math.PI / 2, 0, 0]}
+      position={[0, fx.elevation, 0]}
+      material={getSurfaceMaterial(fx.materialId)}
+      castShadow
+      receiveShadow
+      onClick={(e) => {
+        e.stopPropagation();
+        select({ kind: 'fixture', id: fx.id });
+      }}
+    >
+      {selected && <Edges color={HIGHLIGHT} />}
+    </mesh>
+  );
+});
 
 const FixtureMesh = memo(function FixtureMesh({
   fx,

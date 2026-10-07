@@ -1,9 +1,9 @@
 import { Edges } from '@react-three/drei';
 import { useFrame, type ThreeEvent } from '@react-three/fiber';
-import { memo, useLayoutEffect, useRef } from 'react';
+import { memo, useLayoutEffect, useMemo, useRef } from 'react';
 import type * as THREE from 'three';
 import { pointAlongWall } from '../../domain/geometry';
-import type { Door, Wall } from '../../domain/types';
+import type { Door, Room, Wall } from '../../domain/types';
 import { selectFloor, useDocument } from '../../state/documentStore';
 import { useScene } from '../../state/sceneStore';
 import { doorLeafPoses, type LeafPose } from '../builders/doorLeaves';
@@ -17,13 +17,16 @@ const FRAME = 0.04;
 const DEFAULT_OPEN = 0.9;
 
 export function Doors() {
-  const floor = useDocument(selectFloor);
+  const doors = useDocument((s) => selectFloor(s).doors);
+  const walls = useDocument((s) => selectFloor(s).walls);
+  const rooms = useDocument((s) => selectFloor(s).rooms);
   const selected = useScene((s) => (s.selection?.kind === 'door' ? s.selection.id : null));
   const openDoors = useScene((s) => s.openDoors);
-  const wallById = new Map(floor.walls.map((w) => [w.id, w]));
+  const wallById = useMemo(() => new Map(walls.map((w) => [w.id, w])), [walls]);
+  const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
   return (
     <group name="doors">
-      {floor.doors.map((door) => {
+      {doors.map((door) => {
         const wall = wallById.get(door.wallId);
         return wall ? (
           <DoorMesh
@@ -31,6 +34,7 @@ export function Doors() {
             door={door}
             wall={wall}
             open={openDoors[door.id] ?? true}
+            trimMaterialId={trimFor(door, roomById)}
             selected={selected === door.id}
           />
         ) : null;
@@ -39,18 +43,26 @@ export function Doors() {
   );
 }
 
+/** Frames take the trim finish of the room the door opens into (renovation data, not a constant). */
+function trimFor(door: Door, roomById: Map<string, Room>): string {
+  const swingRoom = door.connects[door.swingSide === 1 ? 1 : 0];
+  const room = roomById.get(swingRoom ?? '') ?? roomById.get(door.connects.find(Boolean) ?? '');
+  return room?.renovation.trimMaterialId ?? 'wood-white';
+}
+
 interface DoorMeshProps {
   door: Door;
   wall: Wall;
   open: boolean;
   selected: boolean;
+  trimMaterialId: string;
 }
 
-const DoorMesh = memo(function DoorMesh({ door, wall, open, selected }: DoorMeshProps) {
+const DoorMesh = memo(function DoorMesh({ door, wall, open, selected, trimMaterialId }: DoorMeshProps) {
   const select = useScene((s) => s.select);
   const toggleDoor = useScene((s) => s.toggleDoor);
   const leaves = doorLeafPoses(door, wall);
-  const frameMat = getSurfaceMaterial('wood-white');
+  const frameMat = getSurfaceMaterial(trimMaterialId);
   const leafMat = getSurfaceMaterial(door.materialId);
   const center = pointAlongWall(wall, door.offset);
   const rot = wallRotationY(wall);

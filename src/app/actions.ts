@@ -1,3 +1,4 @@
+import { APP_VALIDATION, hasSourcePlan, loadKnownPlan } from '../config/plans';
 import { executeIntent } from '../ai/executeIntent';
 import { buildIntentContext, type IntentProvider } from '../ai/intents';
 import { RuleBasedIntentProvider } from '../ai/ruleBasedProvider';
@@ -159,7 +160,7 @@ export function dispatchCommand(cmd: Command): boolean {
 
 // ── Persistence ──────────────────────────────────────────────────────────────────
 let repo: ProjectRepository | null = null;
-const repository = () => (repo ??= new LocalStorageProjectRepository());
+const repository = () => (repo ??= new LocalStorageProjectRepository(window.localStorage, APP_VALIDATION));
 
 export async function saveProject(): Promise<void> {
   try {
@@ -169,6 +170,50 @@ export async function saveProject(): Promise<void> {
   } catch (e) {
     toast('error', `Save failed: ${e instanceof Error ? e.message : String(e)}`);
   }
+}
+
+/**
+ * On start-up, reopen the user's saved work for the current plan (validated and migrated),
+ * so "save → reload" keeps the state. Corrupt or incompatible saves are reported and ignored.
+ */
+let restoreStarted = false;
+export async function restoreSavedSession(): Promise<void> {
+  if (restoreStarted) return; // StrictMode runs mount effects twice in development
+  restoreStarted = true;
+  let saved;
+  try {
+    saved = (await repository().list()).find((m) => m.id === useDocument.getState().apartment.id);
+  } catch {
+    return;
+  }
+  if (!saved) return;
+  try {
+    useDocument.getState().load(await repository().load(saved.id));
+    toast(
+      'info',
+      `Restored your plan saved ${new Date(saved.savedAt).toLocaleString()}. "Cancel" returns to it; reload the plan from the Model tab to start over.`,
+    );
+  } catch (e) {
+    toast(
+      'warning',
+      `Your saved plan could not be restored (${e instanceof Error ? e.message : String(e)}). Starting from the floor plan.`,
+    );
+  }
+}
+
+/** Discard everything and rebuild the model from its source plan. */
+export function resetToSourcePlan(): void {
+  const id = useDocument.getState().apartment.id;
+  if (!hasSourcePlan(id)) {
+    toast(
+      'warning',
+      'The source plan of this model is not available in this session (uploaded images are not stored). Import the image again to rebuild.',
+    );
+    return;
+  }
+  useDocument.getState().load(loadKnownPlan(id));
+  useScene.getState().select(null);
+  toast('info', 'Rebuilt the model from the floor plan. Save to keep this as your plan.');
 }
 
 export async function loadSavedProject(): Promise<void> {
@@ -185,7 +230,7 @@ export async function loadSavedProject(): Promise<void> {
 
 export async function importProjectFile(file: File): Promise<void> {
   try {
-    const { apartment } = deserializeProject(await file.text());
+    const { apartment } = deserializeProject(await file.text(), undefined, APP_VALIDATION);
     useDocument.getState().load(apartment);
     useScene.getState().select(null);
     toast('success', `Imported ${apartment.metadata.name}.`);

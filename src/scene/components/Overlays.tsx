@@ -1,5 +1,5 @@
 import { Html, useTexture } from '@react-three/drei';
-import { useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { planImageUrl } from '../../assets/planImages';
 import { planImageWorldRect } from '../../domain/coordinates';
@@ -15,7 +15,7 @@ import {
 import { roomMetrics } from '../../domain/topology';
 import type { Floor, Vec2 } from '../../domain/types';
 import { formatArea, formatLength } from '../../domain/units';
-import { doorZones, frontClearanceZone, furnitureFootprint, windowZones } from '../../engine/placement';
+import { frontClearanceZone, functionalZones, furnitureFootprint } from '../../engine/placement';
 import { selectFloor, useDocument } from '../../state/documentStore';
 import type { PlacementConstraints } from '../../engine/constraints';
 import { useScene } from '../../state/sceneStore';
@@ -81,6 +81,8 @@ function Segments({ points, color, y = Z_LIFT.debug }: { points: number[]; color
     g.setAttribute('position', new THREE.Float32BufferAttribute(points, 3));
     return g;
   }, [points]);
+  // Rebuilt whenever the model changes while debug is on: free the old buffer each time.
+  useEffect(() => () => geo.dispose(), [geo]);
   if (!points.length) return null;
   return (
     <lineSegments geometry={geo} position={[0, y - Z_LIFT.debug, 0]} raycast={() => null} renderOrder={20}>
@@ -178,14 +180,9 @@ function buildDebugLayers(floor: Floor, constraints: PlacementConstraints) {
       };
       swings.push(pose.hinge.x, y, pose.hinge.z, tip.x, y, tip.z);
     }
-    const z = doorZones(door, wall, constraints);
-    if (z.swing) zones.push(z.swing);
-    zones.push(...z.clearance);
   }
-  for (const win of floor.windows) {
-    const wall = wallById.get(win.wallId);
-    if (wall) zones.push(...windowZones(win, wall, constraints));
-  }
+  // Exactly the zones the placement engine enforces (single source of truth).
+  zones.push(...functionalZones(floor, constraints).map((z) => z.polygon));
   const windows: number[] = [];
   for (const win of floor.windows) {
     const wall = wallById.get(win.wallId);

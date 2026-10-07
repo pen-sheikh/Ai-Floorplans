@@ -9,6 +9,16 @@ export type PlacementIssueCode =
   | 'front-clearance';
 
 /**
+ * What kind of rule an issue breaks:
+ *  - structural: the building itself (room boundary, walls, fixed fittings, columns)
+ *  - furniture:  other movable items
+ *  - functional: zones that must stay usable (door swing/access, window access; later
+ *                kitchen work triangle, bedside access…)
+ *  - clearance:  free space the item itself needs (walkway in front of a sofa or bed)
+ */
+export type IssueCategory = 'structural' | 'furniture' | 'functional' | 'clearance';
+
+/**
  * All spatial rules live here and are passed explicitly to the engine — nothing else in
  * the codebase hard-codes a clearance.
  */
@@ -27,6 +37,11 @@ export interface PlacementConstraints {
   tolerance: number;
   /** Issues that stop an interactive move outright (others are shown but allowed). */
   blocking: PlacementIssueCode[];
+  /**
+   * Soft rules to treat as hard for this request (e.g. an AI request "keep the doors clear"
+   * promotes 'door-clearance'). Fitting then refuses poses that break them.
+   */
+  requireClear?: PlacementIssueCode[];
 }
 
 export const DEFAULT_CONSTRAINTS: Readonly<PlacementConstraints> = Object.freeze({
@@ -49,4 +64,27 @@ export const ISSUE_SEVERITY: Record<PlacementIssueCode, 'hard' | 'soft'> = {
   'door-clearance': 'soft',
   'window-blocked': 'soft',
   'front-clearance': 'soft',
+};
+
+export const ISSUE_CATEGORY: Record<PlacementIssueCode, IssueCategory> = {
+  'outside-room': 'structural',
+  'wall-collision': 'structural',
+  'fixture-collision': 'structural',
+  'furniture-collision': 'furniture',
+  'door-swing': 'functional',
+  'door-clearance': 'functional',
+  'window-blocked': 'functional',
+  'front-clearance': 'clearance',
+};
+
+/** Human wording used in explanations ("violated … by 0.18 m"). */
+export const ISSUE_RULE: Record<PlacementIssueCode, string> = {
+  'outside-room': 'room containment',
+  'wall-collision': 'wall clearance',
+  'fixture-collision': 'fixed fittings',
+  'furniture-collision': 'other furniture',
+  'door-swing': 'door swing',
+  'door-clearance': 'door clearance',
+  'window-blocked': 'window access',
+  'front-clearance': 'walkway clearance',
 };

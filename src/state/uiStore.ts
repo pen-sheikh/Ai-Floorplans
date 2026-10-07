@@ -48,7 +48,7 @@ export const useUi = create<UiState>()((set) => ({
     {
       id: ++seq,
       role: 'assistant',
-      text: 'Hi! I can place furniture, check whether something fits, or renovate a room. Try "Fit a sofa, TV unit and coffee table in the living room" or "Make bedroom 1 Scandinavian".',
+      text: 'Hi! I can place furniture, check whether something fits, or renovate a room. Pick an example below or describe what you want.',
     },
   ],
   setLeftTab: (leftTab) => set({ leftTab }),

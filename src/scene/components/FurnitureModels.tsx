@@ -23,13 +23,26 @@ const white = () => getSurfaceMaterial('fabric-white');
 
 type BoxSpec = [x: number, y: number, z: number, sx: number, sy: number, sz: number, m: THREE.Material];
 
+/**
+ * One unit cube shared by every box of every procedural model; each part is a scaled
+ * instance of it. Hundreds of furniture parts therefore cost one GPU geometry, and moving or
+ * resizing an item never allocates geometry. (Lives for the app's lifetime; never disposed.)
+ */
+const UNIT_BOX = new THREE.BoxGeometry(1, 1, 1);
+
 function Boxes({ boxes }: { boxes: BoxSpec[] }) {
   return (
     <>
       {boxes.map(([x, y, z, sx, sy, sz, m], i) => (
-        <mesh key={i} position={[x, y, z]} material={m} castShadow receiveShadow>
-          <boxGeometry args={[Math.max(sx, 0.005), Math.max(sy, 0.005), Math.max(sz, 0.005)]} />
-        </mesh>
+        <mesh
+          key={i}
+          geometry={UNIT_BOX}
+          position={[x, y, z]}
+          scale={[Math.max(sx, 0.005), Math.max(sy, 0.005), Math.max(sz, 0.005)]}
+          material={m}
+          castShadow
+          receiveShadow
+        />
       ))}
     </>
   );

@@ -1,5 +1,3 @@
-import { getCatalogItem } from '../catalog/furnitureCatalog';
-import { hasMaterial } from '../catalog/materials';
 import {
   approximateOverlapArea,
   cross,
@@ -36,7 +34,16 @@ const ROOM_OVERLAP_TOLERANCE = 0.02;
  * Validate an apartment before it is rendered or saved. Errors mean the geometry is broken
  * and must not be rendered as if it were correct; warnings are suspicious but renderable.
  */
-export function validateApartment(apt: Apartment): ValidationResult {
+/**
+ * Optional reference checks. The domain does not know the material library or furniture
+ * catalog; callers that do (the app) pass lookups so dangling references are reported.
+ */
+export interface ValidationContext {
+  hasMaterial?: (id: string) => boolean;
+  hasCatalogItem?: (id: string) => boolean;
+}
+
+export function validateApartment(apt: Apartment, ctx: ValidationContext = {}): ValidationResult {
   const issues: ValidationIssue[] = [];
   const err = (code: string, message: string, entity?: ValidationIssue['entity']) =>
     issues.push({ severity: 'error', code, message, ...(entity ? { entity } : {}) });
@@ -69,14 +76,29 @@ export function validateApartment(apt: Apartment): ValidationResult {
     f.furniture.forEach((x) => claim('furniture', x.id));
   }
 
-  for (const f of apt.floors ?? []) validateFloor(f, err, warn);
+  for (const f of apt.floors ?? []) validateFloor(f, err, warn, ctx);
 
   return { ok: !issues.some((i) => i.severity === 'error'), issues };
 }
 
 type Report = (code: string, message: string, entity?: ValidationIssue['entity']) => void;
 
-function validateFloor(floor: Floor, err: Report, warn: Report): void {
+function validateFloor(floor: Floor, err: Report, warn: Report, ctx: ValidationContext): void {
+  // Every structural entity must say where its values came from (measured vs assumed).
+  const provenanceOf: [EntityKind, { id: string; sources?: unknown }[]][] = [
+    ['wall', floor.walls],
+    ['door', floor.doors],
+    ['window', floor.windows],
+    ['room', floor.rooms],
+    ['fixture', floor.fixtures],
+  ];
+  for (const [kind, list] of provenanceOf) {
+    for (const e of list) {
+      if (!e.sources || typeof e.sources !== 'object') {
+        err('missing-provenance', `${kind} ${e.id} has no provenance (sources).`, { kind, id: e.id });
+      }
+    }
+  }
   if (!(floor.height > 0))
     err('floor-height', `Floor ${floor.id} has invalid height ${floor.height}.`, {
       kind: 'floor',
@@ -109,7 +131,8 @@ function validateFloor(floor: Floor, err: Report, warn: Report): void {
       room.renovation.floorMaterialId,
       room.renovation.ceilingMaterialId,
     ]) {
-      if (!hasMaterial(id)) warn('unknown-material', `${room.name}: unknown material "${id}".`, ref);
+      if (ctx.hasMaterial && !ctx.hasMaterial(id))
+        warn('unknown-material', `${room.name}: unknown material "${id}".`, ref);
     }
   }
   for (let i = 0; i < floor.rooms.length; i++) {
@@ -221,7 +244,7 @@ function validateFloor(floor: Floor, err: Report, warn: Report): void {
       err('furniture-transform', `${item.name}: invalid position/rotation.`, ref);
       continue;
     }
-    if (!getCatalogItem(item.catalogId))
+    if (ctx.hasCatalogItem && !ctx.hasCatalogItem(item.catalogId))
       warn('furniture-catalog', `${item.name}: unknown catalog item "${item.catalogId}".`, ref);
     const room = roomById.get(item.roomId);
     if (!room) {

@@ -1,149 +1,165 @@
 import { describe, expect, it } from 'vitest';
-import { pointAlongWall, pointStrictlyInPolygon, wallLength } from '../domain/geometry';
+import { pointInPolygon, polygonContainsPolygon, wallLength } from '../domain/geometry';
 import { roomMetrics } from '../domain/topology';
 import { validateApartment } from '../domain/validation';
-import { e2, e2Floor, room } from '../test/fixtures';
-import { PACKENHAM_HOUSE_E2 } from './annotations/packenhamHouseE2';
+import type { FloorPlanAnnotations } from './annotationTypes';
+import { buildApartment, buildApartmentFromSource, StaticAnnotationExtractor } from './extraction';
+import { SYNTHETIC_ANNOTATIONS as SYN } from './fixtures/synthetic/annotations';
 import { reconstructApartment, ReconstructionError } from './reconstruct';
+import { validateAnnotations } from './validateAnnotations';
 
-describe('E2 floor plan → apartment model', () => {
-  const apt = e2();
-  const floor = apt.floors[0]!;
+/**
+ * Generic pipeline tests on a synthetic, non-E2 plan: angled wall, irregular and L-shaped
+ * rooms, concave fixture, dimension-line calibration, automatic-extractor provenance.
+ */
+describe('reconstruction pipeline (plan-agnostic)', () => {
+  const { apartment, annotationIssues, modelIssues } = buildApartment(SYN);
+  const floor = apartment.floors[0]!;
+  const wall = (id: string) => floor.walls.find((w) => w.id === id)!;
 
-  it('produces a valid model', () => {
-    const v = validateApartment(apt);
-    expect(v.issues.filter((i) => i.severity === 'error')).toEqual([]);
-    expect(v.ok).toBe(true);
+  it('produces a valid model with no annotation errors', () => {
+    expect(annotationIssues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(modelIssues.filter((i) => i.severity === 'error')).toEqual([]);
+    expect(validateApartment(apartment).ok).toBe(true);
   });
 
-  it('contains exactly the labelled rooms, plus unlabelled cupboards flagged as inferred', () => {
-    const labelled = floor.rooms.filter((r) => r.labelSource === 'plan-label').map((r) => r.planLabel?.text);
-    expect(labelled.sort()).toEqual([
-      'Balcony',
-      'Bathroom',
-      'Bedroom',
-      'Bedroom',
-      'Hall',
-      'Kitchen/Lounge/Diner',
-    ]);
-    const inferred = floor.rooms.filter((r) => r.labelSource !== 'plan-label');
-    expect(inferred.length).toBe(4);
-    expect(inferred.every((r) => r.type === 'storage')).toBe(true);
-    // No stairs, columns or shafts are drawn on this plan.
-    expect(floor.stairs).toEqual([]);
-    expect(floor.fixtures.some((f) => f.kind === 'column' || f.kind === 'shaft')).toBe(false);
+  it('calibrates from dimension lines (50 px/m)', () => {
+    const cal = apartment.coordinateSystem.plan!.calibration;
+    expect(cal.pixelsPerMeter).toBeCloseTo(50);
+    expect(cal.samples.map((s) => s.referenceId)).toEqual(['dim-top', 'dim-left']);
   });
 
-  it('matches printed room dimensions within 1 % (except the inconsistent Bedroom 2 width)', () => {
-    const cases: [string, number, number][] = [
-      ['bedroom-1', 2.66, 3.84],
-      ['bathroom', 2.31, 1.7],
-      ['kitchen-living', 3.77, 6.39],
-    ];
-    for (const [id, w, d] of cases) {
-      const m = roomMetrics(room(floor, id));
-      expect(Math.abs(m.width - w) / w).toBeLessThan(0.01);
-      expect(Math.abs(m.depth - d) / d).toBeLessThan(0.01);
-    }
-    // Bedroom 2: depth matches the label; drawn width is ≈2.82 m, not the printed 2.61 m.
-    const b2 = roomMetrics(room(floor, 'bedroom-2'));
-    expect(b2.width).toBeGreaterThan(2.78);
-    expect(b2.width).toBeLessThan(2.86);
+  it('builds angled walls with correct length and opening positions', () => {
+    const angled = wall('angled');
+    expect(wallLength(angled)).toBeCloseTo(Math.hypot(100, 100) / 50, 6);
+    const win = floor.windows.find((w) => w.id === 'win-angled')!;
+    // Span [430, 470] on the x axis of a 45° wall → 40/cos45 px wide.
+    expect(win.width).toBeCloseTo(40 / Math.SQRT1_2 / 50, 6);
+    expect(win.offset).toBeCloseTo((450 - 403.5) / Math.SQRT1_2 / 50, 6);
+    expect(win.sillHeight).toBe(0.9);
+  });
+
+  it('keeps irregular and L-shaped rooms exactly', () => {
+    const living = floor.rooms.find((r) => r.id === 'living')!;
+    const bedroom = floor.rooms.find((r) => r.id === 'bedroom')!;
+    expect(roomMetrics(living).area).toBeCloseTo(8 * 6 - 0.5 * 2 * 2, 6);
+    expect(roomMetrics(bedroom).area).toBeCloseTo(4 * 1.8 + 2 * 1.2, 6);
+    expect(pointInPolygon({ x: 7.8, z: 5.8 }, living.polygon)).toBe(false); // in the cut-off corner
+  });
+
+  it('connects rooms and resolves swing sides on any wall', () => {
+    const door = floor.doors.find((d) => d.id === 'door-bed')!;
+    expect([...door.connects].sort()).toEqual(['bedroom', 'living']);
+    expect(door.connects[door.swingSide === 1 ? 1 : 0]).toBe('bedroom');
+    const entry = floor.doors.find((d) => d.id === 'door-entry')!;
+    expect(entry.connects[entry.swingSide === 1 ? 1 : 0]).toBe('living');
+  });
+
+  it('keeps concave fixture outlines', () => {
+    const counter = floor.fixtures.find((f) => f.id === 'counter-l')!;
+    expect(counter.footprint).toHaveLength(6);
+    expect(counter.roomId).toBe('living');
     expect(
-      apt.metadata.notes.some((n) => n.code === 'dimension-label-mismatch' && n.entityId === 'bedroom-2'),
+      polygonContainsPolygon(floor.rooms.find((r) => r.id === 'living')!.polygon, counter.footprint, 0.01),
     ).toBe(true);
   });
 
-  it('keeps non-rectangular geometry: L-shaped Bedroom 2 and the nib notch in the open-plan room', () => {
-    expect(room(floor, 'bedroom-2').polygon).toHaveLength(6);
-    const k = room(floor, 'kitchen-living');
-    expect(k.polygon).toHaveLength(8);
-    const nib = floor.walls.find((w) => w.id === 'w-nib-kitchen')!;
-    expect(pointStrictlyInPolygon(pointAlongWall(nib, wallLength(nib) / 2), k.polygon)).toBe(false);
+  it('records provenance and confidence without changing geometry', () => {
+    expect(wall('angled')).toMatchObject({
+      sources: { geometry: 'detected', height: 'assumed' },
+      confidence: 0.7,
+    });
+    expect(floor.windows.find((w) => w.id === 'win-top')!.sources).toEqual({
+      geometry: 'detected',
+      sillHeight: 'assumed',
+      height: 'assumed',
+    });
+    expect(apartment.metadata.annotationSource).toEqual({
+      method: 'automatic',
+      producer: 'synthetic-test-extractor',
+      confidence: 0.8,
+    });
+    // The same annotations marked as manual give identical geometry, only different provenance.
+    const manual = buildApartment({ ...SYN, source: { method: 'manual' } }).apartment.floors[0]!;
+    expect(manual.walls.map((w) => [w.start, w.end, w.thickness])).toEqual(
+      floor.walls.map((w) => [w.start, w.end, w.thickness]),
+    );
+    expect(manual.walls[0]!.sources.geometry).toBe('plan-geometry');
   });
 
-  it('measures wall thickness from the drawing (external ≈0.20 m, partitions ≈0.10 m)', () => {
-    for (const w of floor.walls) {
-      if (w.kind === 'exterior') expect(w.thickness).toBeCloseTo(0.204, 2);
-      if (w.kind === 'interior' && w.id.startsWith('w-int')) expect(w.thickness).toBeCloseTo(0.102, 2);
-    }
+  it('runs through the extractor boundary unchanged', async () => {
+    const extractor = new StaticAnnotationExtractor({ [SYN.id]: SYN });
+    const res = await buildApartmentFromSource(
+      { id: SYN.id, file: SYN.image.file, mimeType: 'image/png' },
+      extractor,
+    );
+    expect(res.apartment).toEqual(apartment);
+    expect(res.extraction.stages[0]!.status).toBe('ok');
+  });
+});
+
+describe('annotation validation (extractor output is untrusted)', () => {
+  const codes = (ann: FloorPlanAnnotations) =>
+    validateAnnotations(ann)
+      .filter((i) => i.severity === 'error')
+      .map((i) => i.code);
+  const withDoor = (patch: Partial<FloorPlanAnnotations['doors'][number]>) => ({
+    ...SYN,
+    doors: [{ ...SYN.doors[0]!, ...patch }, ...SYN.doors.slice(1)],
   });
 
-  it('cross-checks the total area against the printed 57.4 m²', () => {
-    const note = apt.metadata.notes.find((n) => n.code === 'area-cross-check')!;
-    expect(note.severity).toBe('info');
-    const total = floor.rooms.filter((r) => !r.exterior).reduce((a, r) => a + roomMetrics(r).area, 0);
-    // Room floor areas exclude wall footprints, so they sit just below the gross figure.
-    expect(total).toBeGreaterThan(55);
-    expect(total).toBeLessThan(57.4);
+  it('accepts the synthetic plan', () => {
+    expect(codes(SYN)).toEqual([]);
   });
 
-  it('connects rooms through doors as drawn', () => {
-    const connects = (id: string) => [...floor.doors.find((d) => d.id === id)!.connects].sort();
-    expect(connects('d-bed1')).toEqual(['bedroom-1', 'hall']);
-    expect(connects('d-bed2')).toEqual(['bedroom-2', 'hall']);
-    expect(connects('d-bathroom')).toEqual(['bathroom', 'hall']);
-    expect(connects('d-kitchen')).toEqual(['hall', 'kitchen-living']);
-    expect(connects('d-balcony')).toEqual(['balcony', 'kitchen-living']);
-    expect(connects('d-wardrobe')).toEqual(['bedroom-2', 'wardrobe-bed2']);
-    expect(floor.doors.find((d) => d.id === 'd-front')!.connects).toContain(null);
-    for (const r of floor.rooms) expect(r.doorIds.length).toBeGreaterThan(0);
+  it('reports dangling references, bad spans and overlapping openings', () => {
+    expect(codes(withDoor({ wallId: 'ghost' }))).toContain('opening-wall');
+    expect(codes(withDoor({ span: [600, 700] }))).toContain('opening-outside-wall');
+    expect(
+      codes({
+        ...SYN,
+        windows: [...SYN.windows, { id: 'w2', wallId: 'top', span: [300, 400], kind: 'standard' }],
+      }),
+    ).toContain('opening-overlap');
+    expect(codes(withDoor({ swing: 'up' }))).toContain('door-swing'); // along a vertical wall
   });
 
-  it('records door swing sides from the plan arcs', () => {
-    const swingRoom = (id: string) => {
-      const d = floor.doors.find((x) => x.id === id)!;
-      return d.connects[d.swingSide === 1 ? 1 : 0];
+  it('reports broken polygons, duplicate ids and bad confidences', () => {
+    const bow = {
+      ...SYN.rooms[0]!,
+      polygon: [
+        { x: 0, y: 0 },
+        { x: 10, y: 10 },
+        { x: 10, y: 0 },
+        { x: 0, y: 10 },
+      ],
     };
-    expect(swingRoom('d-bed1')).toBe('bedroom-1');
-    expect(swingRoom('d-bed2')).toBe('bedroom-2');
-    expect(swingRoom('d-bathroom')).toBe('hall');
-    expect(swingRoom('d-cupboard-c')).toBe('hall');
-    expect(swingRoom('d-balcony')).toBe('balcony');
-    expect(swingRoom('d-front')).toBe('hall');
+    expect(codes({ ...SYN, rooms: [bow, SYN.rooms[1]!] })).toContain('room-self-intersection');
+    expect(codes({ ...SYN, rooms: [SYN.rooms[0]!, { ...SYN.rooms[1]!, id: 'living' }] })).toContain(
+      'duplicate-id',
+    );
+    expect(
+      codes({ ...SYN, walls: [{ ...SYN.walls[0]!, confidence: 1.4 }, ...SYN.walls.slice(1)] }),
+    ).toContain('confidence-range');
   });
 
-  it('places windows on exterior walls with the rooms they light', () => {
-    for (const w of floor.windows) {
-      expect(floor.walls.find((x) => x.id === w.wallId)!.kind).toBe('exterior');
+  it('refuses to invent a scale', () => {
+    expect(codes({ ...SYN, calibration: {} })).toContain('no-scale');
+    const r = reconstructApartment({ ...SYN, calibration: {} }, { pixelsPerMeter: 50 });
+    expect(r.coordinateSystem.plan!.calibration).toMatchObject({ method: 'manual', confidence: 'low' });
+  });
+
+  it('reconstruction fails with every annotation error listed', () => {
+    const bad = { ...withDoor({ wallId: 'ghost' }), calibration: {} };
+    try {
+      reconstructApartment(bad);
+      expect.unreachable();
+    } catch (e) {
+      expect(e).toBeInstanceOf(ReconstructionError);
+      expect((e as ReconstructionError).issues.map((i) => i.code).sort()).toEqual([
+        'no-scale',
+        'opening-wall',
+      ]);
     }
-    expect(room(floor, 'bedroom-1').windowIds).toEqual(['win-bed1']);
-    expect([...room(floor, 'kitchen-living').windowIds].sort()).toEqual([
-      'win-kitchen-east',
-      'win-kitchen-north',
-    ]);
-  });
-
-  it('marks assumed values as assumptions, not facts', () => {
-    const ids = apt.metadata.assumptions.map((a) => a.id);
-    expect(ids).toEqual(expect.arrayContaining(['ceiling-height', 'door-height', 'window-heights']));
-    expect(apt.metadata.assumptions.every((a) => a.source === 'assumed')).toBe(true);
-  });
-
-  it('derives north from the compass', () => {
-    const n = apt.coordinateSystem.north!;
-    expect(Math.hypot(n.x, n.z)).toBeCloseTo(1);
-    expect(n.x).toBeGreaterThan(0.8);
-  });
-
-  it('is deterministic', () => {
-    expect(JSON.stringify(e2())).toEqual(JSON.stringify(apt));
-  });
-
-  it('honours a manual scale and flags it', () => {
-    const manual = reconstructApartment(PACKENHAM_HOUSE_E2, { pixelsPerMeter: 100 });
-    expect(manual.coordinateSystem.plan!.calibration.method).toBe('manual');
-    expect(manual.metadata.notes.some((n) => n.code === 'scale-manual')).toBe(true);
-    expect(roomMetrics(manual.floors[0]!.rooms[0]!).area).toBeLessThan(roomMetrics(e2Floor().rooms[0]!).area);
-  });
-
-  it('rejects openings that reference unknown walls or lie outside them', () => {
-    const bad = { ...PACKENHAM_HOUSE_E2, doors: [{ ...PACKENHAM_HOUSE_E2.doors[0]!, wallId: 'nope' }] };
-    expect(() => reconstructApartment(bad)).toThrow(ReconstructionError);
-    const outside = {
-      ...PACKENHAM_HOUSE_E2,
-      doors: [{ ...PACKENHAM_HOUSE_E2.doors[0]!, span: [100, 160] as [number, number] }],
-    };
-    expect(() => reconstructApartment(outside)).toThrow(/outside wall/);
   });
 });

@@ -1,4 +1,4 @@
-import { defaultRenovation } from '../catalog/renovationPresets';
+import { defaultRenovation as catalogDefaultRenovation } from '../catalog/renovationPresets';
 import { planToWorld, type PlanTransform } from '../domain/coordinates';
 import { normalize, polygonArea, pointStrictlyInPolygon, polygonCentroid } from '../domain/geometry';
 import { deriveTopology } from '../domain/topology';
@@ -9,22 +9,23 @@ import {
   type Door,
   type Fixture,
   type Floor,
+  type Provenance,
   type ReconstructionNote,
   type Room,
+  type RoomRenovation,
+  type RoomType,
   type ScaleCalibration,
   type Vec2,
   type Wall,
   type WallKind,
   type Window,
 } from '../domain/types';
-import type {
-  AnnotatedSpan,
-  AnnotatedWall,
-  FloorPlanAnnotation,
-  PxDirection,
-  PxRect,
-} from './annotationTypes';
-import { calibrateFromDimensions, DEFAULT_CALIBRATION_OPTIONS, manualCalibration } from './calibrate';
+import type { AnnotatedFixture, FloorPlanAnnotations, PxDirection, PxPoint } from './annotationTypes';
+import { calibrateAnnotations, DEFAULT_CALIBRATION_OPTIONS, manualCalibration } from './calibrate';
+import { validateAnnotations, type AnnotationIssue } from './validateAnnotations';
+import { pxWallGeometry, spanAlongWall, type PxWallGeometry } from './wallGeometry';
+
+export { wallAxis } from './wallGeometry';
 
 export interface ReconstructOptions {
   /** Override the calibrated scale (px per metre). */
@@ -33,9 +34,18 @@ export interface ReconstructOptions {
   /** Override assumed heights. */
   ceilingHeight?: number;
   doorHeight?: number;
+  /** Starting finishes per room type (configuration, not plan data). */
+  defaultRenovation?: (type: RoomType) => RoomRenovation;
 }
 
-export class ReconstructionError extends Error {}
+export class ReconstructionError extends Error {
+  constructor(
+    message: string,
+    readonly issues: AnnotationIssue[] = [],
+  ) {
+    super(message);
+  }
+}
 
 const WALL_MATERIAL: Record<WallKind, string> = {
   exterior: 'exterior-render',
@@ -43,200 +53,186 @@ const WALL_MATERIAL: Record<WallKind, string> = {
   railing: 'railing-glass',
 };
 
-/** Long-axis description of an axis-aligned wall rectangle. */
-interface WallAxis {
-  axis: 'x' | 'y';
-  /** Pixel coordinate of the wall start along the long axis. */
-  startPx: number;
-  endPx: number;
-  /** Centreline coordinate on the short axis. */
-  centerPx: number;
-  thicknessPx: number;
-}
-
-export function wallAxis(rect: PxRect): WallAxis {
-  const w = rect.x1 - rect.x0;
-  const h = rect.y1 - rect.y0;
-  if (w <= 0 || h <= 0) throw new ReconstructionError(`Degenerate wall rectangle ${JSON.stringify(rect)}`);
-  return w >= h
-    ? { axis: 'x', startPx: rect.x0, endPx: rect.x1, centerPx: (rect.y0 + rect.y1) / 2, thicknessPx: h }
-    : { axis: 'y', startPx: rect.y0, endPx: rect.y1, centerPx: (rect.x0 + rect.x1) / 2, thicknessPx: w };
-}
-
-const DIRECTION: Record<PxDirection, Vec2> = {
-  up: { x: 0, z: -1 },
-  down: { x: 0, z: 1 },
-  left: { x: -1, z: 0 },
-  right: { x: 1, z: 0 },
+const DIRECTION: Record<PxDirection, PxPoint> = {
+  up: { x: 0, y: -1 },
+  down: { x: 0, y: 1 },
+  left: { x: -1, y: 0 },
+  right: { x: 1, y: 0 },
 };
 
-function buildWall(a: AnnotatedWall, t: PlanTransform, height: number): Wall {
-  const ax = wallAxis(a.rect);
-  const start = ax.axis === 'x' ? { x: ax.startPx, y: ax.centerPx } : { x: ax.centerPx, y: ax.startPx };
-  const end = ax.axis === 'x' ? { x: ax.endPx, y: ax.centerPx } : { x: ax.centerPx, y: ax.endPx };
-  return {
-    id: a.id,
-    start: planToWorld(start, t),
-    end: planToWorld(end, t),
-    thickness: ax.thicknessPx / t.pixelsPerMeter,
-    height,
-    kind: a.kind,
-    materialId: WALL_MATERIAL[a.kind],
-    source: 'plan-geometry',
-  };
-}
-
-function spanOnWall(o: AnnotatedSpan, walls: Map<string, AnnotatedWall>, t: PlanTransform, id: string) {
-  const host = walls.get(o.wallId);
-  if (!host) throw new ReconstructionError(`${id} references unknown wall ${o.wallId}`);
-  const ax = wallAxis(host.rect);
-  const [from, to] = o.span[0] <= o.span[1] ? o.span : [o.span[1], o.span[0]];
-  if (from < ax.startPx - 0.5 || to > ax.endPx + 0.5) {
-    throw new ReconstructionError(`${id} span [${from}, ${to}) lies outside wall ${o.wallId}`);
-  }
-  return {
-    offset: ((from + to) / 2 - ax.startPx) / t.pixelsPerMeter,
-    width: (to - from) / t.pixelsPerMeter,
-  };
-}
-
-/** Normal of an axis-aligned wall built by `buildWall` (n = (−d.z, d.x)). */
-const wallNormalForAxis = (axis: 'x' | 'y'): Vec2 => (axis === 'x' ? { x: 0, z: 1 } : { x: -1, z: 0 });
-
-function rectPolygon(r: PxRect, t: PlanTransform): Vec2[] {
+function fixtureOutline(f: AnnotatedFixture): PxPoint[] {
+  if ('polygon' in f) return f.polygon;
+  const r = f.rect;
   return [
-    planToWorld({ x: r.x0, y: r.y0 }, t),
-    planToWorld({ x: r.x1, y: r.y0 }, t),
-    planToWorld({ x: r.x1, y: r.y1 }, t),
-    planToWorld({ x: r.x0, y: r.y1 }, t),
+    { x: r.x0, y: r.y0 },
+    { x: r.x1, y: r.y0 },
+    { x: r.x1, y: r.y1 },
+    { x: r.x0, y: r.y1 },
   ];
 }
 
+const confidence = (c: number | undefined) => (c === undefined ? {} : { confidence: c });
+
 /**
- * Deterministically convert a pixel-space plan annotation into the canonical apartment model.
- * Pure: same annotation + options → same apartment.
+ * Deterministically convert floor-plan annotations into the canonical apartment model.
+ *
+ * Generic: works for any annotations (orthogonal or angled walls, any simple room polygons)
+ * whether they were drawn by a person or produced by an extractor. Pure: same annotations +
+ * options → same apartment. Throws `ReconstructionError` listing every annotation error.
  */
-export function reconstructApartment(ann: FloorPlanAnnotation, options: ReconstructOptions = {}): Apartment {
-  const notes: ReconstructionNote[] = [];
+export function reconstructApartment(ann: FloorPlanAnnotations, options: ReconstructOptions = {}): Apartment {
+  const issues = validateAnnotations(ann);
+  const errors = issues.filter((i) => i.severity === 'error');
+  // A manual scale override makes "no scale" errors irrelevant.
+  const blocking =
+    options.pixelsPerMeter !== undefined ? errors.filter((e) => e.code !== 'no-scale') : errors;
+  if (blocking.length) {
+    throw new ReconstructionError(
+      `Annotations are invalid: ${blocking.map((e) => e.message).join(' ')}`,
+      blocking,
+    );
+  }
+
+  const notes: ReconstructionNote[] = issues
+    .filter((i) => i.severity === 'warning')
+    .map((i) => ({
+      code: `annotation-${i.code}`,
+      severity: 'warning',
+      message: i.message,
+      ...(i.elementId ? { entityId: i.elementId } : {}),
+    }));
   const assumptions: Assumption[] = [];
+  const renovationFor = options.defaultRenovation ?? catalogDefaultRenovation;
+  // Geometry provenance: drawn-and-measured vs detected by software.
+  const geometry: Provenance = ann.source.method === 'automatic' ? 'detected' : 'plan-geometry';
 
   // 1. Scale.
   const calibration: ScaleCalibration =
     options.pixelsPerMeter !== undefined
       ? manualCalibration(options.pixelsPerMeter)
-      : calibrateFromDimensions(ann.rooms, {
+      : calibrateAnnotations(ann, {
           ...DEFAULT_CALIBRATION_OPTIONS,
           ...(options.outlierThreshold !== undefined ? { outlierThreshold: options.outlierThreshold } : {}),
         });
   const t: PlanTransform = { originPx: ann.originPx, pixelsPerMeter: calibration.pixelsPerMeter };
+  const px = (v: number) => v / t.pixelsPerMeter;
 
-  if (calibration.method === 'dimension-labels') {
+  if (calibration.method === 'dimension-labels' || calibration.method === 'reference') {
     const accepted = calibration.samples.filter((s) => s.accepted);
     notes.push({
       code: 'scale-calibrated',
       severity: 'info',
-      message: `Scale ${calibration.pixelsPerMeter.toFixed(2)} px/m from ${accepted.length} printed dimensions (max deviation ${(calibration.maxResidual * 100).toFixed(1)} %).`,
+      message: `Scale ${calibration.pixelsPerMeter.toFixed(2)} px/m from ${accepted.length} ${calibration.method === 'reference' ? 'reference measurement(s)' : 'printed dimension(s)'} (max deviation ${(calibration.maxResidual * 100).toFixed(1)} %, ${calibration.confidence} confidence).`,
     });
     for (const s of calibration.samples.filter((x) => !x.accepted)) {
       notes.push({
         code: 'dimension-label-mismatch',
         severity: 'warning',
-        entityId: s.roomId,
-        message: `Printed ${s.labelMeters.toFixed(2)} m does not match the drawing (≈${(s.measuredPx / calibration.pixelsPerMeter).toFixed(2)} m at the calibrated scale, ${(s.residual * 100).toFixed(0)} %). Geometry kept as drawn; label excluded from calibration.`,
+        entityId: s.roomId ?? s.referenceId,
+        message: `Printed ${s.labelMeters.toFixed(2)} m does not match the drawing (≈${px(s.measuredPx).toFixed(2)} m at the calibrated scale, ${(s.residual * 100).toFixed(0)} %). Geometry kept as drawn; label excluded from calibration.`,
       });
     }
+  } else if (calibration.method === 'estimated') {
+    notes.push({
+      code: 'scale-estimated',
+      severity: 'warning',
+      message: `Scale ESTIMATED from ${calibration.basis ?? 'typical sizes'} (${calibration.pixelsPerMeter.toFixed(1)} px/m). All dimensions are approximate; enter a known measurement to calibrate.`,
+    });
   } else {
     notes.push({
       code: 'scale-manual',
       severity: 'warning',
-      message: 'Scale set manually; dimensions are estimates.',
+      message: 'Scale set manually; all dimensions are estimates.',
     });
   }
 
   const ceilingHeight = options.ceilingHeight ?? ann.defaults.ceilingHeightMeters;
   const doorHeight = options.doorHeight ?? ann.defaults.doorHeightMeters;
-  assumptions.push(
-    {
-      id: 'ceiling-height',
-      description: 'Floor-to-ceiling height (not shown on plan)',
-      value: ceilingHeight,
-      unit: 'm',
-      source: 'assumed',
-    },
-    {
-      id: 'door-height',
-      description: 'Door height (not shown on plan)',
-      value: doorHeight,
-      unit: 'm',
-      source: 'assumed',
-    },
-    {
-      id: 'railing-height',
-      description: 'Balcony balustrade height (not shown on plan)',
-      value: ann.defaults.railingHeightMeters,
-      unit: 'm',
-      source: 'assumed',
-    },
-  );
-
-  // 2. Walls.
-  const annotatedWalls = new Map(ann.walls.map((w) => [w.id, w]));
-  const walls: Wall[] = ann.walls.map((a) =>
-    buildWall(a, t, a.kind === 'railing' ? ann.defaults.railingHeightMeters : ceilingHeight),
-  );
-  for (const w of ann.walls.filter((x) => x.note)) {
-    notes.push({ code: 'wall-note', severity: 'info', entityId: w.id, message: w.note! });
+  const assume = (id: string, description: string, value: number | string, unit?: string) =>
+    assumptions.push({ id, description, value, ...(unit ? { unit } : {}), source: 'assumed' });
+  assume('ceiling-height', 'Floor-to-ceiling height (not shown on plan)', ceilingHeight, 'm');
+  assume('door-height', 'Door height (not shown on plan)', doorHeight, 'm');
+  if (ann.walls.some((w) => w.kind === 'railing')) {
+    assume('railing-height', 'Balustrade height (not shown on plan)', ann.defaults.railingHeightMeters, 'm');
   }
 
-  // 3. Doors.
+  // 2. Walls.
+  const pxWalls = new Map<string, PxWallGeometry>(ann.walls.map((w) => [w.id, pxWallGeometry(w)]));
+  const walls: Wall[] = ann.walls.map((a) => {
+    const g = pxWalls.get(a.id)!;
+    return {
+      id: a.id,
+      start: planToWorld(g.a, t),
+      end: planToWorld(g.b, t),
+      thickness: px(g.thicknessPx),
+      height: a.kind === 'railing' ? ann.defaults.railingHeightMeters : ceilingHeight,
+      kind: a.kind,
+      materialId: WALL_MATERIAL[a.kind],
+      sources: { geometry, height: 'assumed' },
+      ...confidence(a.confidence),
+    };
+  });
+  for (const w of ann.walls.filter((x) => x.note))
+    notes.push({ code: 'wall-note', severity: 'info', entityId: w.id, message: w.note! });
+
+  const opening = (wallId: string, span: [number, number]) => {
+    const { from, to } = spanAlongWall(pxWalls.get(wallId)!, span);
+    return { offset: px((from + to) / 2), width: px(to - from) };
+  };
+
+  // 3. Doors. The swing side is the sign of the drawn swing direction on the wall normal.
   const doors: Door[] = ann.doors.map((d) => {
-    const { offset, width } = spanOnWall(d, annotatedWalls, t, d.id);
-    const ax = wallAxis(annotatedWalls.get(d.wallId)!.rect);
-    const n = wallNormalForAxis(ax.axis);
+    const g = pxWalls.get(d.wallId)!;
     const sw = DIRECTION[d.swing];
-    const side = sw.x * n.x + sw.z * n.z;
-    if (side === 0 && d.kind !== 'opening') {
-      throw new ReconstructionError(`${d.id}: swing '${d.swing}' is parallel to its wall`);
-    }
+    const side = sw.x * -g.dir.y + sw.y * g.dir.x;
     if (d.note) notes.push({ code: 'door-note', severity: 'info', entityId: d.id, message: d.note });
     return {
       id: d.id,
       wallId: d.wallId,
-      offset,
-      width,
+      ...opening(d.wallId, d.span),
       height: d.heightMeters ?? doorHeight,
       kind: d.kind,
       hinge: d.hinge === 'min' ? 'start' : 'end',
       swingSide: side >= 0 ? 1 : -1,
       materialId: 'wood-white',
       connects: [null, null],
-      source: 'plan-geometry',
+      sources: {
+        geometry,
+        height: d.heightFromPlan ? 'plan-label' : 'assumed',
+        swing: d.kind === 'opening' ? 'inferred' : geometry,
+      },
+      ...confidence(d.confidence),
       ...(d.label ? { note: d.label } : {}),
     };
   });
 
   // 4. Windows.
   const windows: Window[] = ann.windows.map((w) => {
-    const { offset, width } = spanOnWall(w, annotatedWalls, t, w.id);
+    const sill = w.sillHeightMeters ?? ann.defaults.windowSillMeters;
+    const head = w.headHeightMeters ?? ann.defaults.windowHeadMeters;
+    const heights: Provenance = w.heightsFromPlan ? 'plan-label' : 'assumed';
     return {
       id: w.id,
       wallId: w.wallId,
-      offset,
-      width,
-      height: w.headHeightMeters - w.sillHeightMeters,
-      sillHeight: w.sillHeightMeters,
+      ...opening(w.wallId, w.span),
+      height: head - sill,
+      sillHeight: sill,
       kind: w.kind,
       materialId: 'upvc-white',
-      source: 'plan-geometry',
+      sources: { geometry, sillHeight: heights, height: heights },
+      ...confidence(w.confidence),
     };
   });
-  const sills = [...new Set(ann.windows.map((w) => `${w.sillHeightMeters}–${w.headHeightMeters} m`))];
-  assumptions.push({
-    id: 'window-heights',
-    description: 'Window sill–head heights (not shown on plan)',
-    value: sills.join(', '),
-    source: 'assumed',
-  });
+  const assumedWindows = ann.windows.filter((w) => !w.heightsFromPlan);
+  if (assumedWindows.length) {
+    const ranges = new Set(
+      assumedWindows.map(
+        (w) =>
+          `${w.sillHeightMeters ?? ann.defaults.windowSillMeters}–${w.headHeightMeters ?? ann.defaults.windowHeadMeters} m`,
+      ),
+    );
+    assume('window-heights', 'Window sill–head heights (not shown on plan)', [...ranges].join(', '));
+  }
 
   // 5. Rooms.
   const rooms: Room[] = ann.rooms.map((r) => {
@@ -258,26 +254,27 @@ export function reconstructApartment(ann: FloorPlanAnnotation, options: Reconstr
       polygon: r.polygon.map((p) => planToWorld(p, t)),
       ceilingHeight,
       exterior: r.exterior ?? false,
+      sources: { geometry, ceilingHeight: 'assumed' },
+      ...confidence(r.confidence),
       wallIds: [],
       doorIds: [],
       windowIds: [],
-      renovation: defaultRenovation(unknown ? 'unknown' : r.type),
+      renovation: renovationFor(unknown ? 'unknown' : r.type),
     };
   });
 
   // 6. Fixtures.
   const fixtures: Fixture[] = ann.fixtures.map((f) => {
-    const footprint = rectPolygon(f.rect, t);
+    const footprint = fixtureOutline(f).map((p) => planToWorld(p, t));
     const c = polygonCentroid(footprint);
     const room = rooms.find((r) => pointStrictlyInPolygon(c, r.polygon));
-    if (f.uncertain) {
+    if (f.uncertain)
       notes.push({
         code: 'fixture-uncertain',
         severity: 'info',
         entityId: f.id,
         message: f.note ?? `${f.label}: nature uncertain.`,
       });
-    }
     return {
       id: f.id,
       roomId: room?.id ?? null,
@@ -287,24 +284,24 @@ export function reconstructApartment(ann: FloorPlanAnnotation, options: Reconstr
       height: f.heightMeters,
       elevation: f.elevationMeters ?? 0,
       materialId: f.materialId,
-      source: f.uncertain ? 'inferred' : 'plan-geometry',
+      sources: { footprint: f.uncertain ? 'inferred' : geometry, height: 'assumed' },
+      ...confidence(f.confidence),
       ...(f.note ? { note: f.note } : {}),
     };
   });
-  assumptions.push({
-    id: 'fixture-heights',
-    description: 'Fixture heights (bath, WC, basin, counters) are typical values, not from the plan',
-    value: 'typical',
-    source: 'assumed',
-  });
+  if (fixtures.length)
+    assume(
+      'fixture-heights',
+      'Fixture heights (baths, WCs, counters…) are typical values, not from the plan',
+      'typical',
+    );
 
   for (const n of ann.drawingNotes)
     notes.push({ code: `drawing-${n.id}`, severity: 'info', message: n.message });
 
   // 7. Area cross-check against the printed total.
-  if (ann.reportedArea) {
-    const envelope = ann.internalEnvelope.map((p) => planToWorld(p, t));
-    const measured = polygonArea(envelope);
+  if (ann.reportedArea && ann.internalEnvelope) {
+    const measured = polygonArea(ann.internalEnvelope.map((p) => planToWorld(p, t)));
     const diff = (measured - ann.reportedArea.m2) / ann.reportedArea.m2;
     notes.push({
       code: 'area-cross-check',
@@ -316,11 +313,11 @@ export function reconstructApartment(ann: FloorPlanAnnotation, options: Reconstr
   // 8. North.
   let north: Apartment['coordinateSystem']['north'];
   if (ann.compass) {
-    const v = normalize({
+    const v: Vec2 = normalize({
       x: ann.compass.northTip.x - ann.compass.center.x,
       z: ann.compass.northTip.y - ann.compass.center.y,
     });
-    north = { ...v, source: 'plan-geometry' };
+    north = { ...v, source: geometry };
   }
 
   const floor: Floor = deriveTopology({
@@ -329,6 +326,7 @@ export function reconstructApartment(ann: FloorPlanAnnotation, options: Reconstr
     level: ann.level,
     elevation: 0,
     height: ceilingHeight,
+    heightSource: 'assumed',
     footprint: ann.footprint.map((p) => planToWorld(p, t)),
     rooms,
     walls,
@@ -368,6 +366,11 @@ export function reconstructApartment(ann: FloorPlanAnnotation, options: Reconstr
       ...(ann.reportedArea
         ? { reportedAreaM2: { value: ann.reportedArea.m2, note: ann.reportedArea.note } }
         : {}),
+      annotationSource: {
+        method: ann.source.method,
+        ...(ann.source.producer ? { producer: ann.source.producer } : {}),
+        ...(ann.source.confidence !== undefined ? { confidence: ann.source.confidence } : {}),
+      },
       assumptions,
       notes,
     },

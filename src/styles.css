@@ -1342,3 +1342,191 @@ table.calibration td {
     max-height: 55%;
   }
 }
+
+/* ── Inspector details (provenance) ───────────────────────────────────────── */
+.details summary {
+  cursor: pointer;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-tertiary);
+}
+
+.kv--small {
+  font-size: 12px;
+  margin-top: 6px;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.kv__row {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.kv__row dd {
+  overflow-wrap: anywhere;
+}
+
+.badge--known,
+.badge--measured {
+  background: #e3f4e8;
+  color: #1e6b34;
+}
+
+.badge--estimated,
+.badge--inferred {
+  background: var(--amber-100);
+  color: var(--amber-950);
+}
+
+.badge--assumed {
+  background: #ece8ff;
+  color: #4b3aa8;
+}
+
+.badge--user {
+  background: #e4effd;
+  color: #1d4f91;
+}
+
+.plan-room:focus-visible,
+.plan-furniture:focus-visible {
+  outline: none;
+  stroke: var(--neutral-1000);
+  stroke-width: 4;
+  stroke-dasharray: none;
+}
+
+/* ── Floor-plan extraction review ──────────────────────────────────────────── */
+.modal--wide {
+  width: min(1100px, 100%);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+  align-items: stretch;
+  text-align: left;
+  padding: 28px 28px 24px;
+}
+
+.extraction__progress ol {
+  margin: 8px 0 0;
+  padding-left: 20px;
+  display: grid;
+  gap: 4px;
+  font-size: 13px;
+}
+
+.extraction__progress li.is-done {
+  color: var(--text-tertiary);
+}
+
+.extraction__progress li.is-current {
+  font-weight: 600;
+}
+
+.extraction__body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 340px;
+  gap: 20px;
+  align-items: start;
+}
+
+.extraction__plan {
+  width: 100%;
+  height: auto;
+  max-height: calc(100vh - 140px);
+  border: 1px solid var(--border-subtle);
+  border-radius: 12px;
+  background: #fff;
+}
+
+.extraction__side {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.extraction__problems {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+  max-height: 260px;
+  overflow: auto;
+}
+
+.extraction__problem {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.extraction__problem:disabled {
+  cursor: default;
+}
+
+.extraction__problem[aria-pressed='true'] {
+  outline: 2px solid var(--amber-500);
+}
+
+.ov-room {
+  fill: rgba(52, 168, 83, 0.12);
+  stroke: rgba(52, 168, 83, 0.7);
+  stroke-width: 1.5;
+}
+
+.ov-room--uncertain {
+  fill: rgba(245, 158, 11, 0.16);
+  stroke-dasharray: 6 4;
+}
+
+.ov-label {
+  fill: #1e6b34;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: middle;
+  paint-order: stroke;
+  stroke: #fff;
+  stroke-width: 3px;
+}
+
+.ov-wall {
+  stroke: rgba(55, 65, 81, 0.75);
+  stroke-linecap: square;
+}
+
+.ov-wall--railing {
+  stroke: rgba(59, 130, 246, 0.8);
+  stroke-dasharray: 4 3;
+}
+
+.ov--weak {
+  stroke: rgba(251, 94, 86, 0.85);
+}
+
+.ov-door {
+  stroke: rgba(52, 168, 83, 0.85);
+}
+
+.ov-opening {
+  stroke: rgba(245, 158, 11, 0.9);
+}
+
+.ov-window {
+  stroke: rgba(59, 130, 246, 0.85);
+}
+
+.ov--hl {
+  stroke: #f59e0b !important;
+  fill: rgba(245, 158, 11, 0.35);
+}
+
+@media (max-width: 900px) {
+  .extraction__body {
+    grid-template-columns: 1fr;
+  }
+}

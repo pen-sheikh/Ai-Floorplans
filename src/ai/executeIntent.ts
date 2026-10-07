@@ -8,8 +8,8 @@ import { formatArea, formatLength } from '../domain/units';
 import type { Command } from '../editor/commands';
 import { planFitMany, planPreset } from '../editor/operations';
 import type { PlacementConstraints } from '../engine/constraints';
-import { fitFurniture } from '../engine/fitting';
-import { buildIntentContext, validateIntent, type Intent } from './intents';
+import { explainFit, fitFurniture } from '../engine/fitting';
+import { buildIntentContext, validateIntent, type Intent, type IntentConstraints } from './intents';
 
 export interface IntentExecution {
   /** Command to dispatch (absent for questions or failures). */
@@ -24,6 +24,23 @@ export interface ExecutionContext {
   apartment: Apartment;
   constraints: PlacementConstraints;
   newId: () => string;
+}
+
+/** Apply an intent's (already validated) rule changes on top of the user's constraints. */
+export function constraintsFor(
+  base: PlacementConstraints,
+  ic: IntentConstraints | undefined,
+): PlacementConstraints {
+  if (!ic) return base;
+  const requireClear = new Set(base.requireClear ?? []);
+  if (ic.preserveDoorClearance) requireClear.add('door-clearance');
+  if (ic.preserveWindowAccess) requireClear.add('window-blocked');
+  return {
+    ...base,
+    ...(ic.minimumWalkway !== undefined ? { walkingClearance: ic.minimumWalkway } : {}),
+    ...(ic.doorClearance !== undefined ? { doorClearance: ic.doorClearance } : {}),
+    requireClear: [...requireClear],
+  };
 }
 
 const roomById = (apt: Apartment, id: string): Room | undefined =>
@@ -60,13 +77,13 @@ export function executeIntent(intent: Intent, ctx: ExecutionContext): IntentExec
         floor,
         room.id,
         requests,
-        ctx.constraints,
+        constraintsFor(ctx.constraints, intent.constraints),
         ctx.newId,
         `Furnish ${room.name}`,
       );
       const lines = result.map((p) => {
         const name = getCatalogItem(p.request.catalogId)?.name ?? p.request.catalogId;
-        if (!p.ok || !p.item) return `✗ ${name}: ${p.reason}`;
+        if (!p.ok || !p.item) return `✗ ${explainFit(p, name, room.name)}`;
         const soft = p.issues.length ? ` (note: ${p.issues.map((i) => i.message).join(' ')})` : '';
         return `✓ ${name} ${describeSpot(p.item, room)}${soft}`;
       });
@@ -93,8 +110,8 @@ export function executeIntent(intent: Intent, ctx: ExecutionContext): IntentExec
       if (!p.ok || !p.item) {
         return {
           ok: true,
-          reply:
-            `No — a ${cat.name.toLowerCase()} (${size}) does not fit in ${room.name} without collisions or blocking a door. ${p.reason ?? ''}`.trim(),
+          reply: `No — a ${cat.name.toLowerCase()} (${size}) does not fit in ${room.name}.
+${explainFit(p, cat.name, room.name)}`,
         };
       }
       const caveat = p.issues.length
@@ -172,3 +189,6 @@ export function executeIntent(intent: Intent, ctx: ExecutionContext): IntentExec
       return { ok: false, reply: intent.reason };
   }
 }
+
+/** Public name for the assistant boundary: structured intent → deterministic execution. */
+export const executeAssistantIntent = executeIntent;
