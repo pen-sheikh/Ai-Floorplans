@@ -1,6 +1,8 @@
-import type { FloorPlanAnnotation } from '../annotationTypes';
+import type { FloorPlanAnnotations } from '../../annotationTypes';
 
 /**
+ * REFERENCE FIXTURE — not production logic.
+ *
  * Annotation of `floor-plans/E2-floorplan.jpg` (1485 × 1080 px, "Packenham House, Third Floor").
  *
  * Every coordinate below was measured from the image by scanning dark-pixel runs (walls are
@@ -11,12 +13,14 @@ import type { FloorPlanAnnotation } from '../annotationTypes';
  * Nothing here is in metres except quantities the plan does not show (heights), which are
  * explicit, documented assumptions. The scale comes from the printed room dimensions.
  */
-export const PACKENHAM_HOUSE_E2: FloorPlanAnnotation = {
+export const E2_ANNOTATIONS: FloorPlanAnnotations = {
+  formatVersion: 1,
   id: 'packenham-house-e2',
   name: 'Packenham House — Third Floor',
   building: 'Packenham House',
   floorLabel: 'Third Floor',
   level: 3,
+  source: { method: 'manual', producer: 'hand-measured from image pixels' },
   image: { file: 'floor-plans/E2-floorplan.jpg', widthPx: 1485, heightPx: 1080 },
   // Outer top-left corner of the building, so all world coordinates are positive.
   originPx: { x: 237, y: 118 },
@@ -53,6 +57,8 @@ export const PACKENHAM_HOUSE_E2: FloorPlanAnnotation = {
     ceilingHeightMeters: 2.4,
     doorHeightMeters: 2.0,
     railingHeightMeters: 1.1,
+    windowSillMeters: 0.9,
+    windowHeadMeters: 2.1,
   },
 
   walls: [
@@ -182,24 +188,18 @@ export const PACKENHAM_HOUSE_E2: FloorPlanAnnotation = {
       wallId: 'w-ext-north',
       span: [301, 442],
       kind: 'standard',
-      sillHeightMeters: 0.9,
-      headHeightMeters: 2.1,
     },
     {
       id: 'win-bed2',
       wallId: 'w-ext-north',
       span: [526, 682],
       kind: 'standard',
-      sillHeightMeters: 0.9,
-      headHeightMeters: 2.1,
     },
     {
       id: 'win-kitchen-north',
       wallId: 'w-ext-north-kitchen',
       span: [876, 1080],
       kind: 'large',
-      sillHeightMeters: 0.9,
-      headHeightMeters: 2.1,
     },
     // Over the sink: a sill above worktop height is assumed.
     {

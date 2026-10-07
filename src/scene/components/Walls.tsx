@@ -10,9 +10,15 @@ import { openingSpans, pieceTransform, wallPieces, type WallPiece } from '../bui
 import { getColorMaterial, getSurfaceMaterial, metricBoxGeometry } from '../materialCache';
 import { HIGHLIGHT, WALL_CUT } from '../sceneConstants';
 
+type Layout = Pick<Floor, 'walls' | 'doors' | 'windows' | 'rooms'>;
+
 /** Rooms on each side of every wall piece. Depends only on geometry, so it is computed once per layout. */
-function useSideRooms(floor: Floor): Map<string, [string | null, string | null][]> {
-  const { walls, doors, windows, rooms } = floor;
+function useSideRooms({
+  walls,
+  doors,
+  windows,
+  rooms,
+}: Layout): Map<string, [string | null, string | null][]> {
   const geometryKey = useMemo(
     () =>
       JSON.stringify([
@@ -30,7 +36,7 @@ function useSideRooms(floor: Floor): Map<string, [string | null, string | null][
       out.set(
         wall.id,
         pieces.map((p) => {
-          const [a, b] = roomsBesideWall(floor, wall, (p.from + p.to) / 2);
+          const [a, b] = roomsBesideWall({ rooms }, wall, (p.from + p.to) / 2);
           return [a?.id ?? null, b?.id ?? null];
         }),
       );
@@ -42,18 +48,23 @@ function useSideRooms(floor: Floor): Map<string, [string | null, string | null][
 }
 
 export function Walls() {
-  const floor = useDocument(selectFloor);
+  // Subscribe to the arrays walls depend on — not the whole floor — so furniture edits
+  // (which leave these arrays referentially identical) do not re-render any wall.
+  const walls = useDocument((s) => selectFloor(s).walls);
+  const doors = useDocument((s) => selectFloor(s).doors);
+  const windows = useDocument((s) => selectFloor(s).windows);
+  const rooms = useDocument((s) => selectFloor(s).rooms);
   const selected = useScene((s) => (s.selection?.kind === 'wall' ? s.selection.id : null));
-  const sideRooms = useSideRooms(floor);
-  const roomById = useMemo(() => new Map(floor.rooms.map((r) => [r.id, r])), [floor.rooms]);
+  const sideRooms = useSideRooms({ walls, doors, windows, rooms });
+  const roomById = useMemo(() => new Map(rooms.map((r) => [r.id, r])), [rooms]);
 
   return (
     <group name="walls">
-      {floor.walls.map((wall) => (
+      {walls.map((wall) => (
         <WallMesh
           key={wall.id}
           wall={wall}
-          openingsKey={JSON.stringify(openingSpans(wall, floor.doors, floor.windows))}
+          openingsKey={JSON.stringify(openingSpans(wall, doors, windows))}
           sides={sideRooms.get(wall.id) ?? []}
           roomById={roomById}
           selected={selected === wall.id}

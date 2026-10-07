@@ -1,3 +1,4 @@
+import { resetToSourcePlan } from '../../app/actions';
 import { roomMetrics } from '../../domain/topology';
 import { formatArea } from '../../domain/units';
 import { selectFloor, useDocument } from '../../state/documentStore';
@@ -90,14 +91,31 @@ export function ModelPanel() {
             <span>Scale</span>
             <div className="note">
               <strong>{cal.pixelsPerMeter.toFixed(2)} px/m</strong>{' '}
-              {cal.method === 'dimension-labels'
-                ? `calibrated from printed room dimensions (max deviation ${(cal.maxResidual * 100).toFixed(1)} %).`
-                : 'set manually — all dimensions are estimates.'}
+              {cal.method === 'estimated'
+                ? `ESTIMATED from ${cal.basis ?? 'typical sizes'}; all dimensions are approximate.`
+                : cal.method === 'reference'
+                  ? 'from a known reference measurement.'
+                  : cal.method === 'dimension-labels'
+                    ? `calibrated from ${cal.samples.filter((s) => s.accepted).length} printed dimension(s), max deviation ${(cal.maxResidual * 100).toFixed(1)} %.`
+                    : 'set manually — all dimensions are estimates.'}{' '}
+              <span
+                className={`badge badge--${cal.confidence === 'high' ? 'known' : cal.confidence === 'medium' ? 'estimated' : 'assumed'}`}
+              >
+                {cal.confidence} confidence
+              </span>
             </div>
+            {apt.metadata.annotationSource && (
+              <div className="note small">
+                Plan interpreted{' '}
+                {apt.metadata.annotationSource.method === 'manual' ? 'manually' : 'automatically'}
+                {apt.metadata.annotationSource.producer ? ` (${apt.metadata.annotationSource.producer})` : ''}
+                .
+              </div>
+            )}
             <table className="calibration">
               <thead>
                 <tr>
-                  <th>Room</th>
+                  <th>Reference</th>
                   <th>Printed</th>
                   <th>Drawn</th>
                   <th />
@@ -106,7 +124,7 @@ export function ModelPanel() {
               <tbody>
                 {cal.samples.map((s, i) => (
                   <tr key={i}>
-                    <td>{floor.rooms.find((r) => r.id === s.roomId)?.name ?? s.roomId}</td>
+                    <td>{floor.rooms.find((r) => r.id === s.roomId)?.name ?? s.referenceId}</td>
                     <td>{s.labelMeters.toFixed(2)} m</td>
                     <td>{(s.measuredPx / cal.pixelsPerMeter).toFixed(2)} m</td>
                     <td>
@@ -135,6 +153,15 @@ export function ModelPanel() {
 
         <section className="field">
           <span>Reconstruction notes</span>
+          <button
+            className="btn btn--sm"
+            onClick={() =>
+              window.confirm('Discard all edits and rebuild the model from the floor plan?') &&
+              resetToSourcePlan()
+            }
+          >
+            Rebuild from floor plan
+          </button>
           {notes.map((n, i) => (
             <div key={i} className={`note ${n.severity === 'warning' ? 'note--warning' : ''}`}>
               {n.message}

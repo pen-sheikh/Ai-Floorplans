@@ -1,5 +1,6 @@
 import { deserializeProject, serializeProject } from '../domain/serialization';
 import type { Apartment } from '../domain/types';
+import type { ValidationContext } from '../domain/validation';
 
 export interface SavedProjectMeta {
   id: string;
@@ -21,7 +22,10 @@ const INDEX_KEY = 'ai-floorplans:projects';
 const projectKey = (id: string) => `ai-floorplans:project:${id}`;
 
 export class LocalStorageProjectRepository implements ProjectRepository {
-  constructor(private readonly storage: Pick<Storage, 'getItem' | 'setItem'> = window.localStorage) {}
+  constructor(
+    private readonly storage: Pick<Storage, 'getItem' | 'setItem'> = window.localStorage,
+    private readonly validation: ValidationContext = {},
+  ) {}
 
   async list(): Promise<SavedProjectMeta[]> {
     try {
@@ -47,7 +51,7 @@ export class LocalStorageProjectRepository implements ProjectRepository {
   async load(id: string): Promise<Apartment> {
     const raw = this.storage.getItem(projectKey(id));
     if (!raw) throw new Error(`No saved project "${id}".`);
-    return deserializeProject(raw).apartment;
+    return deserializeProject(raw, undefined, this.validation).apartment;
   }
 }
 

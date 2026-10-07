@@ -12,7 +12,8 @@ import { getCatalogItem } from '../catalog/furnitureCatalog';
 import { effectiveColor, getMaterialDef, materialsFor } from '../catalog/materials';
 import { polygonArea, wallLength } from '../domain/geometry';
 import { roomMetrics, roomsBesideWall } from '../domain/topology';
-import type { DoorKind, Floor, WindowKind } from '../domain/types';
+import type { DoorKind, EntityKind, Floor, Provenance, WindowKind } from '../domain/types';
+import { formatConfidence, formatMeasured, PROVENANCE_CLASS, PROVENANCE_HELP } from '../domain/provenance';
 import { degToRad, formatArea, formatLength, normalizeAngle, radToDeg } from '../domain/units';
 import { checkPlacement } from '../engine/placement';
 import { selectFloor, useDocument } from '../state/documentStore';
@@ -62,7 +63,7 @@ export function Inspector() {
             <dt>Footprint</dt>
             <dd>{formatArea(polygonArea(fx.footprint))}</dd>
             <dt>Height</dt>
-            <dd>{formatLength(fx.height, 'assumed')} (assumed)</dd>
+            <dd>{formatMeasured(fx.height, fx.sources.height)}</dd>
             <dt>Room</dt>
             <dd>{floor.rooms.find((r) => r.id === fx.roomId)?.name ?? '—'}</dd>
           </dl>
@@ -103,6 +104,7 @@ export function Inspector() {
         </div>
       </div>
       {!collapsed && body}
+      {!collapsed && <EntityDetails floor={floor} kind={selection.kind} id={selection.id} />}
     </aside>
   );
 }
@@ -136,7 +138,8 @@ function RoomInfo({ floor, roomId }: { floor: Floor; roomId: string }) {
         <dd>{formatArea(m.area)}</dd>
         <dt>Extents</dt>
         <dd>
-          {formatLength(m.width)} × {formatLength(m.depth).replace('≈ ', '')}
+          {formatLength(m.width, room.sources.geometry)} ×{' '}
+          {formatLength(m.depth, room.sources.geometry).replace('≈ ', '')}
         </dd>
         {room.planLabel?.dimensionsText && (
           <>
@@ -146,7 +149,7 @@ function RoomInfo({ floor, roomId }: { floor: Floor; roomId: string }) {
         )}
         <dt>Ceiling</dt>
         <dd>
-          {room.exterior ? 'open (outdoor)' : `${formatLength(room.ceilingHeight, 'assumed')} (assumed)`}
+          {room.exterior ? 'open (outdoor)' : formatMeasured(room.ceilingHeight, room.sources.ceilingHeight)}
         </dd>
         <dt>Floor</dt>
         <dd>{getMaterialDef(r.floorMaterialId)?.name}</dd>
@@ -213,11 +216,11 @@ function WallInfo({ floor, id }: { floor: Floor; id: string }) {
         <dt>Type</dt>
         <dd>{wall.kind}</dd>
         <dt>Length</dt>
-        <dd>{formatLength(len)}</dd>
+        <dd>{formatLength(len, wall.sources.geometry)}</dd>
         <dt>Thickness</dt>
-        <dd>{formatLength(wall.thickness)}</dd>
+        <dd>{formatLength(wall.thickness, wall.sources.geometry)}</dd>
         <dt>Height</dt>
-        <dd>{formatLength(wall.height, 'assumed')} (assumed)</dd>
+        <dd>{formatMeasured(wall.height, wall.sources.height)}</dd>
         <dt>Sides</dt>
         <dd>{[a?.name ?? 'outside', b?.name ?? 'outside'].join(' | ')}</dd>
         <dt>Openings</dt>
@@ -245,9 +248,9 @@ function DoorInfo({ floor, id }: { floor: Floor; id: string }) {
         <dt>Connects</dt>
         <dd>{names.join(' ↔ ')}</dd>
         <dt>Clear width</dt>
-        <dd>{formatLength(door.width)}</dd>
+        <dd>{formatLength(door.width, door.sources.geometry)}</dd>
         <dt>Height</dt>
-        <dd>{formatLength(door.height, 'assumed')} (assumed)</dd>
+        <dd>{formatMeasured(door.height, door.sources.height)}</dd>
         <dt>Hinge / swing</dt>
         <dd>
           {door.kind === 'opening'
@@ -305,9 +308,14 @@ function WindowInfo({ floor, id }: { floor: Floor; id: string }) {
     <>
       <dl className="kv">
         <dt>Width</dt>
-        <dd>{formatLength(win.width)}</dd>
+        <dd>{formatLength(win.width, win.sources.geometry)}</dd>
         <dt>Height</dt>
-        <dd>{formatLength(win.height, 'assumed')} (assumed)</dd>
+        <dd>{formatMeasured(win.height, win.sources.height)}</dd>
+        <dt>Sill / head</dt>
+        <dd>
+          {formatMeasured(win.sillHeight, win.sources.sillHeight)} /{' '}
+          {(win.sillHeight + win.height).toFixed(2)} m
+        </dd>
       </dl>
       <label className="field">
         <span>Type</span>
@@ -525,5 +533,112 @@ function NumField({
         onKeyDown={(e) => e.key === 'Enter' && commit(e.currentTarget)}
       />
     </label>
+  );
+}
+
+/**
+ * Developer-facing details for any selected entity: id, type, room, transform and where each
+ * value came from. Built for debugging reconstruction ("is this height measured or assumed?").
+ */
+function EntityDetails({ floor, kind, id }: { floor: Floor; kind: EntityKind; id: string }) {
+  const rows: [string, string][] = [['ID', id]];
+  let sources: Partial<Record<string, Provenance>> | undefined;
+  let confidence: number | undefined;
+  const roomName = (rid: string | null | undefined) => floor.rooms.find((r) => r.id === rid)?.name ?? '—';
+  switch (kind) {
+    case 'room': {
+      const r = floor.rooms.find((x) => x.id === id);
+      if (!r) return null;
+      rows.push(
+        ['Type', r.type],
+        ['Name source', PROVENANCE_CLASS[r.labelSource]],
+        ['Vertices', String(r.polygon.length)],
+      );
+      ({ sources, confidence } = r);
+      break;
+    }
+    case 'wall': {
+      const w = floor.walls.find((x) => x.id === id);
+      if (!w) return null;
+      rows.push(
+        ['Type', w.kind],
+        ['Start', `${w.start.x.toFixed(2)}, ${w.start.z.toFixed(2)}`],
+        ['End', `${w.end.x.toFixed(2)}, ${w.end.z.toFixed(2)}`],
+      );
+      ({ sources, confidence } = w);
+      break;
+    }
+    case 'door': {
+      const d = floor.doors.find((x) => x.id === id);
+      if (!d) return null;
+      rows.push(
+        ['Type', d.kind],
+        ['Wall', d.wallId],
+        ['Offset on wall', `${d.offset.toFixed(2)} m`],
+        ['Hinge / swing side', `${d.hinge} / ${d.swingSide > 0 ? '+n' : '−n'}`],
+      );
+      ({ sources, confidence } = d);
+      break;
+    }
+    case 'window': {
+      const w = floor.windows.find((x) => x.id === id);
+      if (!w) return null;
+      rows.push(['Type', w.kind], ['Wall', w.wallId], ['Offset on wall', `${w.offset.toFixed(2)} m`]);
+      ({ sources, confidence } = w);
+      break;
+    }
+    case 'fixture': {
+      const f = floor.fixtures.find((x) => x.id === id);
+      if (!f) return null;
+      rows.push(['Type', f.kind], ['Room', roomName(f.roomId)], ['Vertices', String(f.footprint.length)]);
+      ({ sources, confidence } = f);
+      break;
+    }
+    case 'furniture': {
+      const f = floor.furniture.find((x) => x.id === id);
+      if (!f) return null;
+      rows.push(
+        ['Catalog', f.catalogId],
+        ['Room', roomName(f.roomId)],
+        ['Position', `${f.position.x.toFixed(2)}, ${f.position.z.toFixed(2)} m`],
+        ['Rotation', `${Math.round(radToDeg(normalizeAngle(f.rotation)))}°`],
+        [
+          'Size',
+          `${f.dimensions.width.toFixed(2)} × ${f.dimensions.depth.toFixed(2)} × ${f.dimensions.height.toFixed(2)} m`,
+        ],
+        ['Source', 'user placed'],
+      );
+      break;
+    }
+    default:
+      return null;
+  }
+  return (
+    <details className="details">
+      <summary>Details</summary>
+      <dl className="kv kv--small">
+        {rows.map(([k, v]) => (
+          <div key={k} className="kv__row">
+            <dt>{k}</dt>
+            <dd>{v}</dd>
+          </div>
+        ))}
+        {sources &&
+          Object.entries(sources).map(([field, p]) => (
+            <div key={field} className="kv__row">
+              <dt>Source: {field}</dt>
+              <dd title={PROVENANCE_HELP[PROVENANCE_CLASS[p!]]}>
+                <span className={`badge badge--${PROVENANCE_CLASS[p!]}`}>{PROVENANCE_CLASS[p!]}</span>
+              </dd>
+            </div>
+          ))}
+        {kind !== 'furniture' && (
+          <div className="kv__row">
+            <dt>Confidence</dt>
+            <dd>{formatConfidence(confidence)}</dd>
+          </div>
+        )}
+      </dl>
+    </details>
   );
 }

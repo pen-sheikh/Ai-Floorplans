@@ -1,5 +1,8 @@
+import { MIGRATIONS, type Migration } from './migrations';
 import { SCHEMA_VERSION, type Apartment } from './types';
-import { validateApartment, type ValidationIssue } from './validation';
+import { validateApartment, type ValidationContext, type ValidationIssue } from './validation';
+
+export { MIGRATIONS, type Migration } from './migrations';
 
 export const PROJECT_FORMAT = 'ai-floorplans/apartment-project';
 
@@ -10,15 +13,6 @@ export interface ProjectFile {
   savedAt: string;
   apartment: Apartment;
 }
-
-/** A migration upgrades a raw document from version N to N + 1. */
-export type Migration = (doc: Record<string, unknown>) => Record<string, unknown>;
-
-/**
- * Registry of migrations keyed by the version they upgrade FROM. Version 1 is the first
- * published schema, so the registry is empty today; add `1: (doc) => …` when v2 lands.
- */
-export const MIGRATIONS: Readonly<Record<number, Migration>> = {};
 
 export class ProjectLoadError extends Error {
   constructor(
@@ -53,7 +47,13 @@ export function migrateDocument(
   while (version < target) {
     const step = migrations[version];
     if (!step) throw new ProjectLoadError(`No migration from schema v${version}.`);
-    current = step(current);
+    try {
+      current = step(current);
+    } catch (e) {
+      throw new ProjectLoadError(
+        `Migration from schema v${version} failed: ${e instanceof Error ? e.message : String(e)}`,
+      );
+    }
     version += 1;
     current = { ...current, schemaVersion: version };
   }
@@ -67,7 +67,8 @@ export function migrateDocument(
 export function deserializeProject(
   json: string,
   migrations: Readonly<Record<number, Migration>> = MIGRATIONS,
-): { apartment: Apartment; issues: ValidationIssue[] } {
+  ctx: ValidationContext = {},
+): { apartment: Apartment; issues: ValidationIssue[]; migratedFrom?: number } {
   let raw: unknown;
   try {
     raw = JSON.parse(json);
@@ -88,10 +89,11 @@ export function deserializeProject(
   if (!Array.isArray(apartment.floors)) throw new ProjectLoadError('Project apartment has no floors.');
   let result: ReturnType<typeof validateApartment>;
   try {
-    result = validateApartment(apartment);
+    result = validateApartment(apartment, ctx);
   } catch {
     throw new ProjectLoadError('Project structure is malformed.');
   }
   if (!result.ok) throw new ProjectLoadError('Project failed validation.', result.issues);
-  return { apartment, issues: result.issues };
+  const from = typeof file.schemaVersion === 'number' ? file.schemaVersion : SCHEMA_VERSION;
+  return { apartment, issues: result.issues, ...(from < SCHEMA_VERSION ? { migratedFrom: from } : {}) };
 }

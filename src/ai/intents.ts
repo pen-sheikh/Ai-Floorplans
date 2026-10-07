@@ -14,7 +14,7 @@ export type Intent =
       roomId: string;
       furniture: string[];
       placement?: 'longest_wall' | 'any';
-      constraints?: { preserveDoorClearance?: boolean; preserveWindowAccess?: boolean };
+      constraints?: IntentConstraints;
     }
   | { action: 'check_fit'; roomId: string; furniture: string }
   | { action: 'renovate'; roomIds: string[]; preset?: string; patch?: Partial<RoomRenovation> }
@@ -23,6 +23,21 @@ export type Intent =
   | { action: 'unknown'; text: string; reason: string };
 
 export type IntentAction = Intent['action'];
+
+/** Per-request rule changes an assistant may ask for. All are validated and bounded. */
+export interface IntentConstraints {
+  /** Treat door access zones as hard (no furniture in front of doors). */
+  preserveDoorClearance?: boolean;
+  /** Treat window access zones as hard. */
+  preserveWindowAccess?: boolean;
+  /** Minimum walkway in front of items, metres (0.3–2.0). */
+  minimumWalkway?: number;
+  /** Clear depth in front of doors, metres (0.3–2.0). */
+  doorClearance?: number;
+}
+
+/** Public names for the assistant boundary. */
+export type AssistantIntent = Intent;
 
 /** Everything a model needs to know to emit valid intents (serialisable for an LLM prompt). */
 export interface IntentContext {

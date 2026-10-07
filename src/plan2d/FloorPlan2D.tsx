@@ -1,9 +1,10 @@
-import { useMemo, useRef, useState } from 'react';
+import { useRef, useState } from 'react';
 import { planImageUrl } from '../assets/planImages';
 import { planTransformOf, worldToPlan, type PlanTransform } from '../domain/coordinates';
 import { pointAlongWall, polygonCentroid, wallFootprint } from '../domain/geometry';
 import type { Floor, Vec2 } from '../domain/types';
-import { checkPlacement, furnitureFootprint } from '../engine/placement';
+import { furnitureConflicts } from '../engine/conflicts';
+import { furnitureFootprint } from '../engine/placement';
 import { selectFloor, useDocument } from '../state/documentStore';
 import { useScene } from '../state/sceneStore';
 import { IconMinus, IconPlus, IconPointer } from '../ui/icons';
@@ -39,10 +40,7 @@ export function FloorPlan2D() {
   const pan = useRef<{ x: number; y: number; vx: number; vy: number } | null>(null);
   const svgRef = useRef<SVGSVGElement>(null);
 
-  const conflicts = useMemo(
-    () => new Set(floor.furniture.filter((f) => checkPlacement(floor, f, constraints).hard).map((f) => f.id)),
-    [floor, constraints],
-  );
+  const conflicts = furnitureConflicts(floor, constraints);
 
   if (!t || !image) {
     return (
@@ -110,6 +108,17 @@ export function FloorPlan2D() {
             <polygon
               key={r.id}
               data-room={r.id}
+              tabIndex={0}
+              role="button"
+              aria-pressed={selected}
+              aria-label={`Room ${r.name}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  select({ kind: 'room', id: r.id });
+                }
+              }}
+              onFocus={() => setHover({ kind: 'room', id: r.id })}
               className={`plan-room${selected ? ' plan-room--selected' : ''}${hover?.kind === 'room' && hover.id === r.id ? ' plan-room--hover' : ''}`}
               points={toPoints(r.polygon, t)}
               onPointerEnter={(e) => {
@@ -137,6 +146,16 @@ export function FloorPlan2D() {
               key={f.id}
               className={`plan-furniture${sel ? ' plan-furniture--selected' : ''}${conflicts.has(f.id) ? ' plan-furniture--conflict' : ''}`}
               points={toPoints(furnitureFootprint(f), t)}
+              tabIndex={0}
+              role="button"
+              aria-pressed={sel}
+              aria-label={`${f.name}${conflicts.has(f.id) ? ' (conflict)' : ''}`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  select({ kind: 'furniture', id: f.id });
+                }
+              }}
               onClick={(e) => {
                 e.stopPropagation();
                 select({ kind: 'furniture', id: f.id });

@@ -59,7 +59,7 @@ describe('fitFurniture', () => {
   it('says no — with a reason — when an item cannot fit', () => {
     const { placements } = fitFurniture(floor, 'bathroom', [{ catalogId: 'bed-king' }], C, testId);
     expect(placements[0]!.ok).toBe(false);
-    expect(placements[0]!.reason).toMatch(/No position in Bathroom/);
+    expect(placements[0]!.reason).toMatch(/No position or orientation in Bathroom/);
     const unknown = fitFurniture(floor, 'bathroom', [{ catalogId: 'spaceship' }], C, testId);
     expect(unknown.placements[0]!.reason).toMatch(/Unknown furniture/);
   });

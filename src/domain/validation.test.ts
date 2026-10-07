@@ -90,3 +90,20 @@ describe('apartment validation', () => {
     expect(codes(apt)).toContain('schema-version');
   });
 });
+
+describe('provenance', () => {
+  it('rejects structural entities without provenance', () => {
+    const apt = broken((f) => {
+      delete (f.walls[0] as Partial<(typeof f.walls)[number]>).sources;
+    });
+    expect(codes(apt)).toContain('missing-provenance');
+  });
+
+  it('checks catalog references only when the caller provides lookups', () => {
+    const apt = broken((f) => (f.rooms[0]!.renovation.floorMaterialId = 'no-such-material'));
+    expect(codes(apt)).not.toContain('unknown-material');
+    expect(validateApartment(apt, { hasMaterial: () => false }).issues.map((i) => i.code)).toContain(
+      'unknown-material',
+    );
+  });
+});

@@ -1,16 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { askAssistant, dispatchCommand } from '../app/actions';
+import { suggestedPrompts } from '../ai/suggestions';
+import { roomMetrics } from '../domain/topology';
+import { selectFloor, useDocument } from '../state/documentStore';
 import { useUi } from '../state/uiStore';
 import { IconSend, IconX } from './icons';
-
-const EXAMPLES = [
-  'Put a 3-seat sofa against the longest wall in the living room',
-  'Fit a TV unit and coffee table in the living room',
-  'Can I fit a king-size bed in bedroom 1?',
-  'Renovate bedroom 2 with warm wood flooring and light beige walls',
-  'Make the bathroom marble floor',
-  'Make bedroom 1 Scandinavian',
-];
 
 /**
  * Natural-language control. Text → structured intent (shown under each reply) →
@@ -22,6 +16,12 @@ export function AssistantPanel() {
   const [text, setText] = useState('');
   const [busy, setBusy] = useState(false);
   const listRef = useRef<HTMLDivElement>(null);
+  // Rooms only: furniture edits must not re-render the chat.
+  const rooms = useDocument((st) => selectFloor(st).rooms);
+  const examples = useMemo(
+    () => suggestedPrompts(rooms.map((r) => ({ name: r.name, type: r.type, areaM2: roomMetrics(r).area }))),
+    [rooms],
+  );
 
   useEffect(() => {
     listRef.current?.scrollTo({ top: listRef.current.scrollHeight, behavior: 'smooth' });
@@ -77,7 +77,7 @@ export function AssistantPanel() {
       </div>
       {messages.length <= 1 && (
         <div className="chips" aria-label="Examples">
-          {EXAMPLES.map((e) => (
+          {examples.map((e) => (
             <button key={e} className="chip" onClick={() => void send(e)}>
               {e}
             </button>

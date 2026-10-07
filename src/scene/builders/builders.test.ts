@@ -16,7 +16,7 @@ const wall: Wall = {
   height: 2.4,
   kind: 'interior',
   materialId: 'paint-white',
-  source: 'plan-geometry',
+  sources: { geometry: 'plan-geometry', height: 'assumed' },
 };
 
 describe('wall mesh builder', () => {

@@ -14,7 +14,7 @@
  * referenced from rooms by id. A wall shared by two rooms therefore exists exactly once.
  */
 
-export const SCHEMA_VERSION = 1 as const;
+export const SCHEMA_VERSION = 2 as const;
 
 /** A point on the floor plane, in metres. */
 export interface Vec2 {
@@ -22,18 +22,30 @@ export interface Vec2 {
   z: number;
 }
 
-/** Where a value came from. Used to avoid presenting estimates as facts. */
+/**
+ * Where a value came from. Used to avoid presenting estimates as facts.
+ *
+ * | Provenance      | Meaning                                                    | Shown as  |
+ * |-----------------|------------------------------------------------------------|-----------|
+ * | `plan-label`    | Printed on the plan (text/dimension label)                 | known     |
+ * | `plan-geometry` | Measured from the drawing at the calibrated scale          | measured  |
+ * | `detected`      | Produced by an automatic extractor (carries a confidence)  | estimated |
+ * | `estimated`     | Derived by a heuristic or from an uncalibrated/manual scale | estimated |
+ * | `inferred`      | Deduced from drawing conventions (e.g. unlabelled cupboard)| inferred  |
+ * | `assumed`       | Not on the plan; a documented default                      | assumed   |
+ * | `user`          | Entered or changed by a user                               | user      |
+ */
 export type Provenance =
-  /** Read directly from text printed on the plan (e.g. "3.84m x 2.66m"). */
-  | 'plan-label'
-  /** Measured from the drawn geometry of the plan at the calibrated scale. */
-  | 'plan-geometry'
-  /** Inferred from drawing conventions (e.g. an unlabelled enclosed space with a door = cupboard). */
-  | 'inferred'
-  /** Not on the plan; a documented default. */
-  | 'assumed'
-  /** Entered or changed by a user. */
-  | 'user';
+  'plan-label' | 'plan-geometry' | 'detected' | 'estimated' | 'inferred' | 'assumed' | 'user';
+
+/**
+ * Per-property provenance for an entity. Geometry measured from a plan and heights assumed
+ * because the plan is silent can live on the same entity without being confused.
+ */
+export type Sources<K extends string> = Record<K, Provenance>;
+
+/** Confidence in [0, 1] for detected/inferred entities. Absent = not assessed (manual data). */
+export type Confidence = number;
 
 export interface Assumption {
   id: string;
@@ -62,15 +74,30 @@ export interface PlanImageReference {
 
 export interface ScaleCalibration {
   pixelsPerMeter: number;
-  method: 'dimension-labels' | 'manual';
-  /** Each label-vs-geometry comparison used to derive the scale. */
+  /**
+   * reference: an explicitly given known measurement; dimension-labels: printed dimensions
+   * (read by a person or detected by OCR); manual: a scale typed in by the user;
+   * estimated: a fallback from typical sizes (e.g. door widths) — never exact.
+   */
+  method: 'reference' | 'dimension-labels' | 'manual' | 'estimated';
+  /** What an estimated or manual scale was based on. */
+  basis?: string;
+  /** Each reference measurement compared with the drawing to derive the scale. */
   samples: ScaleSample[];
   /** Relative spread of accepted samples (max |residual|), e.g. 0.004 = 0.4 %. */
   maxResidual: number;
+  /**
+   * high: ≥ 3 agreeing references within 2 %; medium: ≥ 2 references within 5 %;
+   * low: a single reference, a manual scale, or wide disagreement.
+   */
+  confidence: 'high' | 'medium' | 'low';
 }
 
 export interface ScaleSample {
-  roomId: string;
+  /** Id of the reference measurement (dimension label or dimension line). */
+  referenceId: string;
+  /** Room the reference belongs to, if it is a room dimension label. */
+  roomId?: string;
   labelMeters: number;
   measuredPx: number;
   pixelsPerMeter: number;
@@ -93,8 +120,18 @@ export interface CoordinateSystem {
   north?: Vec2 & { source: Provenance };
 }
 
+/** How the plan annotations behind this model were produced. */
+export interface AnnotationSourceInfo {
+  method: 'manual' | 'automatic';
+  /** Tool or person, e.g. "hand-measured" or "wall-detector@0.3". */
+  producer?: string;
+  /** Overall confidence reported by an automatic extractor. */
+  confidence?: Confidence;
+}
+
 export interface ApartmentMetadata {
   name: string;
+  annotationSource?: AnnotationSourceInfo;
   building?: string;
   floorLabel?: string;
   /** Area quoted on the plan, if any. */
@@ -120,6 +157,7 @@ export interface Floor {
   elevation: number;
   /** Default floor-to-ceiling height in metres. */
   height: number;
+  heightSource: Provenance;
   /** Outer footprint of the unit (outer faces of the exterior walls), used for the slab. */
   footprint: Vec2[];
   rooms: Room[];
@@ -165,6 +203,8 @@ export interface Room {
   ceilingHeight: number;
   /** Open to the sky (balcony/terrace): no ceiling. */
   exterior: boolean;
+  sources: Sources<'geometry' | 'ceilingHeight'>;
+  confidence?: Confidence;
   /** Derived references (rebuilt by `deriveRoomRefs`). */
   wallIds: string[];
   doorIds: string[];
@@ -184,7 +224,9 @@ export interface Wall {
   kind: WallKind;
   /** Base material id when no room finish applies (e.g. exterior face). */
   materialId: string;
-  source: Provenance;
+  /** `geometry` covers centreline and thickness; `height` is usually assumed. */
+  sources: Sources<'geometry' | 'height'>;
+  confidence?: Confidence;
 }
 
 export type DoorKind = 'hinged' | 'double' | 'sliding' | 'bifold' | 'opening';
@@ -209,7 +251,9 @@ export interface Door {
   materialId: string;
   /** Rooms on the −n and +n side, resolved during reconstruction. */
   connects: [string | null, string | null];
-  source: Provenance;
+  /** `geometry` = position/width; `swing` = hinge and swing side. */
+  sources: Sources<'geometry' | 'height' | 'swing'>;
+  confidence?: Confidence;
   note?: string;
 }
 
@@ -224,7 +268,9 @@ export interface Window {
   sillHeight: number;
   kind: WindowKind;
   materialId: string;
-  source: Provenance;
+  /** Head height = sillHeight + height (derived, never stored). */
+  sources: Sources<'geometry' | 'sillHeight' | 'height'>;
+  confidence?: Confidence;
 }
 
 export interface Stair {
@@ -259,7 +305,8 @@ export interface Fixture {
   /** Elevation of the bottom of the fixture (e.g. a hob sits on a counter). */
   elevation: number;
   materialId: string;
-  source: Provenance;
+  sources: Sources<'footprint' | 'height'>;
+  confidence?: Confidence;
   note?: string;
 }
 

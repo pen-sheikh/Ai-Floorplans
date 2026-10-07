@@ -1,23 +1,15 @@
-import type { Apartment } from '../domain/types';
-import { PACKENHAM_HOUSE_E2 } from './annotations/packenhamHouseE2';
-import type { FloorPlanAnnotation } from './annotationTypes';
-import { reconstructApartment, type ReconstructOptions } from './reconstruct';
-
-/** Plans available in this repository. A future upload/extraction step would add to this. */
-export const PLAN_ANNOTATIONS: Record<string, FloorPlanAnnotation> = {
-  [PACKENHAM_HOUSE_E2.id]: PACKENHAM_HOUSE_E2,
-};
-
-export const DEFAULT_PLAN_ID = PACKENHAM_HOUSE_E2.id;
-
-export function loadApartmentFromPlan(
-  planId: string = DEFAULT_PLAN_ID,
-  options?: ReconstructOptions,
-): Apartment {
-  const ann = PLAN_ANNOTATIONS[planId];
-  if (!ann) throw new Error(`Unknown plan ${planId}`);
-  return reconstructApartment(ann, options);
-}
-
-export { reconstructApartment } from './reconstruct';
-export type { FloorPlanAnnotation } from './annotationTypes';
+/**
+ * Generic floor-plan pipeline. Nothing in this module (or below it) depends on a specific
+ * plan; reference plans live in `fixtures/` and are registered in `src/config/plans.ts`.
+ */
+export * from './annotationTypes';
+export {
+  calibrateAnnotations,
+  calibrateFromReferences,
+  calibrationReferences,
+  CalibrationError,
+  manualCalibration,
+} from './calibrate';
+export { reconstructApartment, ReconstructionError, type ReconstructOptions } from './reconstruct';
+export { validateAnnotations, type AnnotationIssue } from './validateAnnotations';
+export * from './extraction';

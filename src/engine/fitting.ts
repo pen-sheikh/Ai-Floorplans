@@ -13,7 +13,7 @@ import {
   vec,
 } from '../domain/geometry';
 import type { Dimensions3, Floor, FurnitureItem, Room, Vec2 } from '../domain/types';
-import type { PlacementConstraints } from './constraints';
+import { ISSUE_RULE, type PlacementConstraints } from './constraints';
 import { checkPlacement, type PlacementIssue, type PlacementSubject } from './placement';
 
 export interface FitRequest {
@@ -25,20 +25,43 @@ export interface FitRequest {
   preferWall?: 'longest' | 'any';
 }
 
+/** A candidate pose and what it would violate. */
+export interface FitAttempt {
+  position: Vec2;
+  rotation: number;
+  violations: PlacementIssue[];
+}
+
+export type FitFailureKind =
+  'unknown-room' | 'unknown-item' | 'too-large' | 'no-wall-long-enough' | 'no-valid-position';
+
 export interface FitPlacement {
   request: FitRequest;
+  /** True when a position without hard violations was found. */
   ok: boolean;
   /** The placed item (present when ok). */
   item?: FurnitureItem;
-  /** Soft issues the chosen spot still has. */
+  /** Soft issues the chosen spot still has (empty = ideal). */
   issues: PlacementIssue[];
+  failure?: FitFailureKind;
+  /** Short reason, suitable for a toast. */
   reason?: string;
+  /** On failure: the candidate that came closest, with measured violations. */
+  bestAttempt?: FitAttempt;
+  /** Number of candidate poses evaluated (for diagnostics). */
+  candidatesTried: number;
 }
 
 export interface FitResult {
   placements: FitPlacement[];
   /** Floor including all successfully placed items. */
   floor: Floor;
+}
+
+export interface FitOptions {
+  newId: () => string;
+  /** Catalog to read dimensions and placement rules from (defaults to the built-in one). */
+  catalog?: (id: string) => FurnitureCatalogItem | undefined;
 }
 
 interface Candidate {
@@ -51,43 +74,81 @@ interface Candidate {
 const STEP = 0.05;
 const GRID = 0.1;
 
+const hardTotal = (issues: PlacementIssue[]) =>
+  issues.filter((i) => i.severity === 'hard').reduce((sum, i) => sum + (i.amount ?? 1), 0);
+
 /**
  * Deterministic automated furniture fitting.
  *
  * For each request (in order) the engine generates candidate poses — backs against room
- * edges for wall-placed items, a grid for free-standing ones — and keeps the best pose that
- * has no hard issue under `checkPlacement`. Placed items become obstacles for later requests.
- * AI layers may *suggest* requests; only this function decides where (and whether) they fit.
+ * edges for wall-placed items, a grid in two orientations for free-standing ones — and keeps
+ * the best pose with no hard violation under `checkPlacement`. Placed items become obstacles
+ * for later requests. On failure it reports the closest attempt and what it violated, by how
+ * much. Input: model geometry + dimensions + constraints; no rendering state is involved.
  */
 export function fitFurniture(
   floor: Floor,
   roomId: string,
   requests: readonly FitRequest[],
   constraints: PlacementConstraints,
-  newId: () => string,
+  options: FitOptions | (() => string),
 ): FitResult {
+  const opts: FitOptions = typeof options === 'function' ? { newId: options } : options;
+  const lookup = opts.catalog ?? getCatalogItem;
   const room = floor.rooms.find((r) => r.id === roomId);
   let current = floor;
   const placements: FitPlacement[] = [];
+  const fail = (
+    request: FitRequest,
+    failure: FitFailureKind,
+    reason: string,
+    extra: Partial<FitPlacement> = {},
+  ) => placements.push({ request, ok: false, issues: [], failure, reason, candidatesTried: 0, ...extra });
 
   for (const request of requests) {
-    const cat = getCatalogItem(request.catalogId);
-    if (!room || !cat) {
-      placements.push({
-        request,
-        ok: false,
-        issues: [],
-        reason: !room ? `Unknown room ${roomId}.` : `Unknown furniture ${request.catalogId}.`,
-      });
+    const cat = lookup(request.catalogId);
+    if (!room) {
+      fail(request, 'unknown-room', `Unknown room ${roomId}.`);
+      continue;
+    }
+    if (!cat) {
+      fail(request, 'unknown-item', `Unknown furniture ${request.catalogId}.`);
       continue;
     }
     const dims: Dimensions3 = { ...cat.dimensions, ...request.dimensions };
+    const name = cat.name.toLowerCase();
+    const size = `${dims.width.toFixed(2)} × ${dims.depth.toFixed(2)} m`;
+
+    // Cheap impossibility check: bigger than the room's extents in both orientations.
+    const b = polygonBounds(room.polygon);
+    const [W, D] = [b.maxX - b.minX, b.maxZ - b.minZ];
+    const fitsBox = (w: number, d: number) => (w <= W && d <= D) || (w <= D && d <= W);
+    if (!fitsBox(dims.width, dims.depth)) {
+      fail(
+        request,
+        'too-large',
+        `A ${name} (${size}) is larger than ${room.name} (${W.toFixed(2)} × ${D.toFixed(2)} m) in every orientation.`,
+      );
+      continue;
+    }
+
     const candidates = cat.placement.againstWall
       ? wallCandidates(room, dims, request.preferWall ?? cat.placement.preferWall, constraints.wallGap)
       : freeCandidates(room, dims, anchorFor(current, room, cat, dims));
+    if (!candidates.length) {
+      fail(
+        request,
+        'no-wall-long-enough',
+        `No wall in ${room.name} is long enough for a ${name} (${dims.width.toFixed(2)} m wide).`,
+      );
+      continue;
+    }
 
     let best: { c: Candidate; issues: PlacementIssue[]; total: number } | null = null;
+    let closest: { attempt: FitAttempt; badness: number } | null = null;
+    let tried = 0;
     for (const c of candidates) {
+      tried++;
       const subject: PlacementSubject = {
         catalogId: cat.id,
         roomId: room.id,
@@ -95,24 +156,34 @@ export function fitFurniture(
         rotation: c.rotation,
         dimensions: dims,
       };
-      const report = checkPlacement(current, subject, constraints);
-      if (report.hard || report.roomId !== room.id) continue;
+      const report = checkPlacement(current, subject, constraints, { catalog: lookup });
+      if (report.hard || report.roomId !== room.id) {
+        const badness =
+          report.issues.filter((i) => i.severity === 'hard').length * 10 + hardTotal(report.issues);
+        if (!closest || badness < closest.badness) {
+          closest = {
+            attempt: { position: c.position, rotation: c.rotation, violations: report.issues },
+            badness,
+          };
+        }
+        continue;
+      }
       const total = report.issues.length * 100 + c.score;
       if (!best || total < best.total) best = { c, issues: report.issues, total };
       if (best.issues.length === 0 && c.score === 0) break;
     }
 
     if (!best) {
-      placements.push({
+      fail(
         request,
-        ok: false,
-        issues: [],
-        reason: `No position in ${room.name} fits a ${cat.name.toLowerCase()} (${dims.width.toFixed(2)} × ${dims.depth.toFixed(2)} m) without collisions.`,
-      });
+        'no-valid-position',
+        `No position or orientation in ${room.name} fits a ${name} (${size}) without breaking a hard rule.`,
+        { candidatesTried: tried, ...(closest ? { bestAttempt: closest.attempt } : {}) },
+      );
       continue;
     }
     const item: FurnitureItem = {
-      id: newId(),
+      id: opts.newId(),
       catalogId: cat.id,
       name: cat.name,
       category: cat.category,
@@ -125,10 +196,34 @@ export function fitFurniture(
       ...(request.color ? { color: request.color } : {}),
     };
     current = { ...current, furniture: [...current.furniture, item] };
-    placements.push({ request, ok: true, item, issues: best.issues });
+    placements.push({ request, ok: true, item, issues: best.issues, candidatesTried: tried });
   }
 
   return { placements, floor: current };
+}
+
+/**
+ * Multi-line explanation of a fitting result, written for people and for an AI assistant to
+ * relay ("Cannot place king-size bed … best candidate violated door swing by 0.18 m").
+ */
+export function explainFit(p: FitPlacement, itemName: string, roomName?: string): string {
+  const where = roomName ? ` in ${roomName}` : '';
+  if (p.ok) {
+    if (!p.issues.length) return `Placed ${itemName}${where}. All hard rules and clearances are satisfied.`;
+    return [`Placed ${itemName}${where}, with compromises:`, ...p.issues.map((i) => `- ${i.message}`)].join(
+      '\n',
+    );
+  }
+  const lines = [`Cannot place ${itemName}${where}.`, `Reason: ${p.reason ?? 'no valid position.'}`];
+  if (p.bestAttempt) {
+    lines.push(`Checked ${p.candidatesTried} candidate positions/orientations.`);
+    lines.push('Best candidate violated:');
+    for (const v of p.bestAttempt.violations) {
+      const by = v.amount !== undefined ? ` by ${v.amount.toFixed(2)} m` : '';
+      lines.push(`- ${ISSUE_RULE[v.code]}${by}${v.severity === 'soft' ? ' (preference)' : ''}`);
+    }
+  }
+  return lines.join('\n');
 }
 
 /** Back against each room edge, facing inwards, centred first then sliding outwards. */

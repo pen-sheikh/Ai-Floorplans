@@ -2,16 +2,18 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import jpeg from 'jpeg-js';
 import { describe, expect, it } from 'vitest';
-import { PACKENHAM_HOUSE_E2 as ANN } from './annotations/packenhamHouseE2';
-import type { PxRect } from './annotationTypes';
-import { wallAxis } from './reconstruct';
+import { E2_ANNOTATIONS as ANN } from './annotations';
+import type { AnnotatedWall, PxRect } from '../../annotationTypes';
+import { wallAxis } from '../../wallGeometry';
 
 /**
  * Checks the hand annotation against the actual pixels of floor-plans/E2-floorplan.jpg, so
  * the model cannot silently drift from the plan: walls must sit on dark (wall-fill) pixels,
  * openings must be gaps, and room interiors must be light.
  */
-const img = jpeg.decode(readFileSync(resolve(__dirname, '../../', ANN.image.file)), { useTArray: true });
+const img = jpeg.decode(readFileSync(resolve(__dirname, '../../../../', ANN.image.file)), {
+  useTArray: true,
+});
 const luma = (x: number, y: number) => {
   const i = (Math.round(y) * img.width + Math.round(x)) * 4;
   return 0.299 * img.data[i]! + 0.587 * img.data[i + 1]! + 0.114 * img.data[i + 2]!;
@@ -35,7 +37,10 @@ function spanRect(r: PxRect, from: number, to: number): PxRect {
   return wallAxis(r).axis === 'x' ? { ...r, x0: from, x1: to } : { ...r, y0: from, y1: to };
 }
 
-const walls = new Map(ANN.walls.map((w) => [w.id, w]));
+type RectWall = Extract<AnnotatedWall, { rect: PxRect }>;
+/** E2 is an orthogonal plan: every wall is annotated as its drawn rectangle. */
+const rectWalls = ANN.walls.filter((w): w is RectWall => 'rect' in w);
+const walls = new Map(rectWalls.map((w) => [w.id, w]));
 const openings = [...ANN.doors, ...ANN.windows];
 /** Walls the plan draws without solid fill (balustrade lines, a door frame of jambs only). */
 const NOT_SOLID = new Set(['w-rail-north', 'w-rail-east', 'w-int-cupboard-front']);
@@ -51,7 +56,9 @@ describe('E2 annotation fidelity (pixels of the real plan)', () => {
     expect([img.width, img.height]).toEqual([ANN.image.widthPx, ANN.image.heightPx]);
   });
 
-  it.each(ANN.walls.filter((w) => !NOT_SOLID.has(w.id)).map((w) => [w.id, w] as const))(
+  it('annotates every E2 wall as a rectangle', () => expect(rectWalls).toHaveLength(ANN.walls.length));
+
+  it.each(rectWalls.filter((w) => !NOT_SOLID.has(w.id)).map((w) => [w.id, w] as const))(
     'wall %s lies on wall fill',
     (_id, w) => {
       // Exclude openings in this wall from the solid check.

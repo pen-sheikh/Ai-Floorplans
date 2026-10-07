@@ -1,6 +1,7 @@
 import { useRef } from 'react';
 import { useShallow } from 'zustand/react/shallow';
 import { exportProject, importProjectFile, loadSavedProject, saveProject } from '../app/actions';
+import { startExtraction } from '../app/extractionActions';
 import { useDocument } from '../state/documentStore';
 import { useScene, type CameraMode, type LightingMode, type ViewMode } from '../state/sceneStore';
 import { useUi } from '../state/uiStore';
@@ -157,6 +158,7 @@ export function Toolbar() {
   const redoLabel = useDocument((s) => s.future[0]?.label);
   const dirty = useDocument((s) => s.dirty);
   const fileRef = useRef<HTMLInputElement>(null);
+  const planRef = useRef<HTMLInputElement>(null);
   const toast = useUi((s) => s.toast);
   const show3d = scene.viewMode !== '2d';
 
@@ -273,6 +275,24 @@ export function Toolbar() {
         <button className="tool" onClick={() => fileRef.current?.click()} title="Import project JSON">
           <IconUpload size={16} /> Import
         </button>
+        <button
+          className="tool"
+          onClick={() => planRef.current?.click()}
+          title="Build a model from a floor plan image (extracted on this device)"
+        >
+          <IconPlan size={16} /> Import plan
+        </button>
+        <input
+          ref={planRef}
+          type="file"
+          accept="image/png,image/jpeg,image/webp"
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) void startExtraction(f);
+            e.target.value = '';
+          }}
+        />
         <input
           ref={fileRef}
           type="file"

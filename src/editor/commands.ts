@@ -93,7 +93,24 @@ export function applyCommand(apt: Apartment, cmd: Command): Apartment {
       const target = floorWith(apt, (f) => f.doors.some((d) => d.id === cmd.id), `Door ${cmd.id}`);
       return mapFloors(apt, (f) =>
         f === target
-          ? { ...f, doors: updateIn(f.doors, cmd.id, (d) => ({ ...d, ...cmd.patch }), 'Door') }
+          ? {
+              ...f,
+              doors: updateIn(
+                f.doors,
+                cmd.id,
+                (d) => ({
+                  ...d,
+                  ...cmd.patch,
+                  // A user-entered measurement is no longer a plan measurement or an assumption.
+                  sources: {
+                    ...d.sources,
+                    ...(cmd.patch.width !== undefined ? { geometry: 'user' as const } : {}),
+                    ...(cmd.patch.height !== undefined ? { height: 'user' as const } : {}),
+                  },
+                }),
+                'Door',
+              ),
+            }
           : f,
       );
     }
@@ -101,7 +118,23 @@ export function applyCommand(apt: Apartment, cmd: Command): Apartment {
       const target = floorWith(apt, (f) => f.windows.some((w) => w.id === cmd.id), `Window ${cmd.id}`);
       return mapFloors(apt, (f) =>
         f === target
-          ? { ...f, windows: updateIn(f.windows, cmd.id, (w) => ({ ...w, ...cmd.patch }), 'Window') }
+          ? {
+              ...f,
+              windows: updateIn(
+                f.windows,
+                cmd.id,
+                (w) => ({
+                  ...w,
+                  ...cmd.patch,
+                  sources: {
+                    ...w.sources,
+                    ...(cmd.patch.sillHeight !== undefined ? { sillHeight: 'user' as const } : {}),
+                    ...(cmd.patch.height !== undefined ? { height: 'user' as const } : {}),
+                  },
+                }),
+                'Window',
+              ),
+            }
           : f,
       );
     }
