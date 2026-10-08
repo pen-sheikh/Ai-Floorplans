@@ -1,0 +1,30 @@
+{
+  "id": "plan-appartement-fr",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "Clean French CAD plan; labels in French; overall size in feet (\"pi\").",
+  "image": {
+    "cache": "plan-appartement-fr.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/c/cc/Plan_appartement.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "5d4a0e21ad3d459e8c31b1a15acf31edbcf298dfd75b4372908bbd97700ec312"
+  },
+  "source": {
+    "title": "File:Plan appartement.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Plan_appartement.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Jeangagnon"
+  },
+  "truth": {
+    "rooms": 8,
+    "roomTypes": ["bedroom", "living", "kitchen", "bathroom"],
+    "labels": ["CHAMBRE", "SALON", "CUISINE"],
+    "scaleSource": "printed"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 5,
+    "roomTypes": ["bedroom"],
+    "maxSeconds": 60
+  }
+}

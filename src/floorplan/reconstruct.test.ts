@@ -163,3 +163,31 @@ describe('annotation validation (extractor output is untrusted)', () => {
     }
   });
 });
+
+describe('provenance of automatically extracted rooms', () => {
+  const auto: FloorPlanAnnotations = {
+    ...SYN,
+    source: { method: 'automatic', producer: 'test' },
+    rooms: SYN.rooms.map((r, i) =>
+      i === 0
+        ? { ...r, name: 'Room 1', type: 'unknown', labelSource: 'unknown', geometryConfidence: 0.9 }
+        : { ...r, labelSource: 'plan-label', labelConfidence: 0.8, classificationConfidence: 0.7 },
+    ),
+  };
+  const { apartment } = buildApartment(auto);
+  const [unknown, read] = apartment.floors[0]!.rooms;
+
+  it('keeps an unlabelled room as "Unknown Room" with its floor, never a guessed type', () => {
+    expect(unknown).toMatchObject({ name: 'Unknown Room', type: 'unknown', labelSource: 'inferred' });
+    expect(unknown!.sources.name).toBeUndefined();
+    expect(unknown!.sources.type).toBeUndefined();
+    expect(unknown!.polygon.length).toBeGreaterThanOrEqual(3);
+    expect(unknown!.geometryConfidence).toBe(0.9);
+  });
+
+  it('marks names read by OCR as "ocr", not as printed fact', () => {
+    expect(read!.labelSource).toBe('ocr');
+    expect(read!.sources).toMatchObject({ name: 'ocr', type: 'ocr' });
+    expect(read).toMatchObject({ labelConfidence: 0.8, classificationConfidence: 0.7 });
+  });
+});

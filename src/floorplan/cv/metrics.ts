@@ -35,6 +35,9 @@ export interface ExtractionMetrics {
     kindCorrect: number;
     kindWrong: string[];
     missed: string[];
+    /** Extracted walls that correspond to a real wall. */
+    precision: number;
+    recall: number;
   };
   rooms: {
     expected: number;
@@ -43,8 +46,14 @@ export interface ExtractionMetrics {
     minIoU: number;
     meanIoUAll: number;
     missed: string[];
+    /** Matched rooms whose extracted type equals the truth (any source). */
     labelsCorrect: number;
     perRoom: { id: string; iou: number; matchedId?: string }[];
+    detectionRate: number;
+    /** Of matched rooms that have a printed label: label read and type right. */
+    labelAccuracy: number;
+    /** Of all matched rooms: type right (from label or other evidence); "unknown" counts wrong. */
+    classificationAccuracy: number;
   };
   doors: OpeningMetrics & { swingCorrect: number; hingedCompared: number };
   windows: OpeningMetrics;
@@ -56,6 +65,8 @@ export interface OpeningMetrics {
   extractedCount: number;
   falsePositives: number;
   detectionRate: number;
+  precision: number;
+  recall: number;
   positionErrorM: Stats;
   widthErrorM: Stats;
   missed: string[];
@@ -184,11 +195,14 @@ export function compareAnnotations(
   const exMasks = extracted.rooms.map((r) => ({ r, m: raster(r.polygon) }));
   const perRoom: { id: string; iou: number; matchedId?: string }[] = [];
   let labelsCorrect = 0;
+  let labelled = 0;
+  let labelRight = 0;
   for (const r of truth.rooms) {
     const m = raster(r.polygon);
     let best = 0;
     let bestId: string | undefined;
     let bestType: string | undefined;
+    let bestSource: string | undefined;
     for (const e of exMasks) {
       let inter = 0;
       let uni = 0;
@@ -203,6 +217,7 @@ export function compareAnnotations(
         best = iou;
         bestId = e.r.id;
         bestType = e.r.type;
+        bestSource = e.r.labelSource;
       }
     }
     perRoom.push({
@@ -211,6 +226,10 @@ export function compareAnnotations(
       ...(best >= 0.5 && bestId ? { matchedId: bestId } : {}),
     });
     if (best >= 0.5 && bestType === r.type) labelsCorrect++;
+    if (best >= 0.5 && r.labelSource === 'plan-label') {
+      labelled++;
+      if (bestSource === 'plan-label' && bestType === r.type) labelRight++;
+    }
   }
   const matched = perRoom.filter((p) => p.matchedId);
 
@@ -231,6 +250,8 @@ export function compareAnnotations(
       kindCorrect,
       kindWrong,
       missed: missedWalls,
+      precision: extracted.walls.length ? (extracted.walls.length - falseWalls) / extracted.walls.length : 0,
+      recall: detectedWalls / Math.max(1, truth.walls.length),
     },
     rooms: {
       expected: truth.rooms.length,
@@ -242,6 +263,9 @@ export function compareAnnotations(
       missed: perRoom.filter((p) => !p.matchedId).map((p) => p.id),
       labelsCorrect,
       perRoom,
+      detectionRate: matched.length / Math.max(1, truth.rooms.length),
+      labelAccuracy: labelled ? labelRight / labelled : NaN,
+      classificationAccuracy: matched.length ? labelsCorrect / matched.length : NaN,
     },
     doors: compareOpenings(truth, extracted, truth.doors, extracted.doors, ppm, true) as OpeningMetrics & {
       swingCorrect: number;
@@ -328,6 +352,8 @@ function compareOpenings(
     extractedCount: e.length,
     falsePositives: e.length - used.size,
     detectionRate: (t.length - missed.length) / Math.max(1, t.length),
+    precision: e.length ? used.size / e.length : 0,
+    recall: (t.length - missed.length) / Math.max(1, t.length),
     positionErrorM: stats(pos),
     widthErrorM: stats(width),
     missed,

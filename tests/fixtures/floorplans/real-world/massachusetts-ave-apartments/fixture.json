@@ -1,0 +1,28 @@
+{
+  "id": "massachusetts-ave-apartments",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "1900s printed plan of a large apartment: dense symbols, hand lettering.",
+  "image": {
+    "cache": "massachusetts-ave-apartments.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/4/46/Typical_Floor_Plan%E2%80%94Apartment_House_at_1785_Massachusetts_Avenue.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "b0c5045293e8478072c4c8c36fcaae66cc4942df9af4fa99ff46104f9a7152a0"
+  },
+  "source": {
+    "title": "File:Typical Floor Plan—Apartment House at 1785 Massachusetts Avenue.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Typical_Floor_Plan%E2%80%94Apartment_House_at_1785_Massachusetts_Avenue.jpg",
+    "license": "Public domain",
+    "licenseUrl": null,
+    "author": "Jules Henri de Sibour"
+  },
+  "truth": {
+    "rooms": 40,
+    "roomTypes": ["bedroom", "bathroom", "kitchen", "living", "dining", "hall", "storage"],
+    "labels": ["CHAMBER", "BATH", "KITCHEN", "DINING ROOM", "LIVING ROOM", "SALON", "CORRIDOR", "FOYER"],
+    "scaleSource": "none"
+  },
+  "expect": {
+    "status": ["needs-review", "failed"],
+    "maxSeconds": 120
+  }
+}

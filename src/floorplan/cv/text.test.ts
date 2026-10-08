@@ -31,8 +31,30 @@ describe('matchRoomName', () => {
     ['W.C.', 'toilet'],
     ['Balcony', 'balcony'],
     ['Living Room', 'living'],
+    ['master bed', 'bedroom'],
+    ['bed 1', 'bedroom'],
+    ['BED R.', 'bedroom'],
+    ['w/c', 'toilet'],
+    ['t&b', 'bathroom'],
+    ['Reception', 'living'],
+    ['Utility Room', 'utility'],
+    ['Store', 'storage'],
+    ['CHAMBRE', 'bedroom'],
+    ['Küche', 'kitchen'],
+    ['SALON', 'living'],
+    ['Wohnzimmer', 'living'],
+    ['Study', 'unknown'],
   ])('%s → %s', (raw, type) => {
     expect(matchRoomName(raw)?.type).toBe(type);
+  });
+
+  it('builds a clean display name and keeps the raw text', () => {
+    const m = matchRoomName('bedroom 2 why', 0.9)!;
+    expect(m.display).toBe('Bedroom 2');
+    expect(m.raw).toBe('bedroom 2 why');
+    expect(matchRoomName('MASTER BEDROOM')!.display).toBe('Master Bedroom');
+    expect(matchRoomName('Kitchen/Lounge/Diner')!.display).toBe('Kitchen / Lounge / Diner');
+    expect(matchRoomName('Zimmer 4')!.typeWeight).toBeLessThan(0.6);
   });
 
   it('keeps the text exactly as read and charges confidence for corrections', () => {
@@ -72,7 +94,17 @@ describe('parseDimension', () => {
     expect(d.raw).toBe(text);
   });
 
-  it.each(['12\'7" x 8\'9"', 'KITCHEN', '2', '57'])('ignores %j', (text) => {
+  it.each([
+    ['12\'7" x 8\'9"', [3.8354, 2.667]],
+    ['14\'0"X12\'8"', [4.2672, 3.8608]],
+    ['10\'-6"', [3.2004]],
+  ] as const)('feet and inches: %s', (text, values) => {
+    const d = parseDimension(text)!;
+    expect(d.unit).toBe('ft');
+    expect(d.values).toEqual(values);
+  });
+
+  it.each(['KITCHEN', '2', '57', '20 pi'])('ignores %j', (text) => {
     expect(parseDimension(text)).toBeNull();
   });
 

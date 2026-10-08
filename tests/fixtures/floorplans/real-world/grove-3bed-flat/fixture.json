@@ -1,0 +1,29 @@
+{
+  "id": "grove-3bed-flat",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "Watercolour sales plan with an angled wall.",
+  "image": {
+    "cache": "grove-3bed-flat.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/5/52/The_Grove_Floorplan_3_Bedroom_Flat_111_Sqm.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "4f3f015423676577031b40daad3f9dd42cece1507e571b871115342bc2e7a49b"
+  },
+  "source": {
+    "title": "File:The Grove Floorplan 3 Bedroom Flat 111 Sqm.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:The_Grove_Floorplan_3_Bedroom_Flat_111_Sqm.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Rockwell Land"
+  },
+  "truth": {
+    "rooms": 12,
+    "roomTypes": ["bedroom", "bathroom", "kitchen", "living", "utility", "balcony"],
+    "labels": ["master bedroom", "bedroom 2", "bedroom 3", "living", "dining", "kitchen", "t&b"],
+    "scaleSource": "none"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 4,
+    "maxSeconds": 60
+  }
+}

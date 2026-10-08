@@ -1,0 +1,30 @@
+{
+  "id": "tyneside-flat",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "Two floors of a Tyneside flat side by side; doors drawn as single leaves (no arcs), rotated labels, stairs.",
+  "image": {
+    "cache": "tyneside-flat.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/9/9c/Tyneside_flat_floorplan.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "bd13a8f50fbd7e75049f10f64fd9ac401c60cb9e9d79343358e4306b9e47c89c"
+  },
+  "source": {
+    "title": "File:Tyneside flat floorplan.png",
+    "page": "https://commons.wikimedia.org/wiki/File:Tyneside_flat_floorplan.png",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Andy Dingley"
+  },
+  "truth": {
+    "rooms": 14,
+    "roomTypes": ["bedroom", "bathroom", "kitchen", "living", "hall"],
+    "labels": ["Shower", "Kitchen", "Lounge", "Bedroom"],
+    "scaleSource": "none"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 6,
+    "roomTypes": ["bedroom", "living", "bathroom"],
+    "maxSeconds": 60
+  }
+}

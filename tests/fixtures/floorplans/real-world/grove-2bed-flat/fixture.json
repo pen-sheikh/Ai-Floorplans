@@ -1,0 +1,30 @@
+{
+  "id": "grove-2bed-flat",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "Watercolour sales plan: coloured floors and furniture, lowercase labels, no dimensions.",
+  "image": {
+    "cache": "grove-2bed-flat.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/4/47/The_Grove_Floorplan_2_Bedroom_Flat_97_Sqm.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "ac253098d8ddbe3c57c36c4149136907b1a3327f8ec3017714a8419938fee6b5"
+  },
+  "source": {
+    "title": "File:The Grove Floorplan 2 Bedroom Flat 97 Sqm.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:The_Grove_Floorplan_2_Bedroom_Flat_97_Sqm.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Rockwell Land"
+  },
+  "truth": {
+    "rooms": 10,
+    "roomTypes": ["bedroom", "bathroom", "kitchen", "living", "utility", "balcony"],
+    "labels": ["balcony", "living", "bedroom 2", "master bedroom", "dining", "t&b", "kitchen", "utility"],
+    "scaleSource": "none"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 4,
+    "roomTypes": ["bedroom"],
+    "maxSeconds": 60
+  }
+}

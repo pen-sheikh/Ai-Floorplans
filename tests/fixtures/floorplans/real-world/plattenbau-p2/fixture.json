@@ -1,0 +1,39 @@
+{
+  "id": "plattenbau-p2",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "German Plattenbau flat: grey walls, open doorways without door symbols, German labels.",
+  "image": {
+    "cache": "plattenbau-p2.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/a/a1/Grundriss_Plattenbau_P2.JPG?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "b7082e792e825e7d88d47d0ee557dc5a93abfe5c38dc1e64652d4aca5d3325b5"
+  },
+  "source": {
+    "title": "File:Grundriss Plattenbau P2.JPG",
+    "page": "https://commons.wikimedia.org/wiki/File:Grundriss_Plattenbau_P2.JPG",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "http://creativecommons.org/licenses/by-sa/3.0/",
+    "author": "Martin Püschel"
+  },
+  "truth": {
+    "rooms": 10,
+    "roomTypes": ["living", "kitchen", "bathroom", "hall", "bedroom", "balcony"],
+    "labels": [
+      "Wohnzimmer",
+      "Küche",
+      "Bad",
+      "Flur",
+      "Kammer",
+      "Zimmer 2",
+      "Zimmer 3",
+      "Zimmer 4",
+      "Treppenhaus"
+    ],
+    "scaleSource": "none"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 2,
+    "maxSeconds": 60
+  }
+}

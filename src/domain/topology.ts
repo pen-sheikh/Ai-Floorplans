@@ -8,9 +8,23 @@ import {
 } from './geometry';
 import type { Apartment, Door, Floor, Room, Vec2, Wall, Window } from './types';
 
+const boundsCache = new WeakMap<readonly Vec2[], ReturnType<typeof polygonBounds>>();
+const boundsOf = (poly: readonly Vec2[]) => {
+  let b = boundsCache.get(poly);
+  if (!b) boundsCache.set(poly, (b = polygonBounds(poly)));
+  return b;
+};
+
 /** Room whose interior contains the point (boundary excluded), or null. */
 export function roomAt(floor: Pick<Floor, 'rooms'>, p: Vec2): Room | null {
-  return floor.rooms.find((r) => pointStrictlyInPolygon(p, r.polygon)) ?? null;
+  return (
+    floor.rooms.find((r) => {
+      const b = boundsOf(r.polygon);
+      return (
+        p.x > b.minX && p.x < b.maxX && p.z > b.minZ && p.z < b.maxZ && pointStrictlyInPolygon(p, r.polygon)
+      );
+    }) ?? null
+  );
 }
 
 /** Probe distance beyond the wall face used to find the room on each side. */
@@ -30,7 +44,8 @@ export function roomsBesideWall(
 export function roomsAlongWall(floor: Pick<Floor, 'rooms'>, wall: Wall): Set<string> {
   const ids = new Set<string>();
   const len = wallLength(wall);
-  const steps = Math.max(2, Math.ceil(len / 0.1));
+  // Every ~10 cm, but never more than a few hundred probes (bounds the cost on huge walls).
+  const steps = Math.min(400, Math.max(2, Math.ceil(len / 0.1)));
   for (let i = 0; i <= steps; i++) {
     for (const r of roomsBesideWall(floor, wall, (len * i) / steps)) if (r) ids.add(r.id);
   }

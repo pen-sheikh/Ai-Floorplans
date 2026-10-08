@@ -62,11 +62,15 @@ export function ModelPanel() {
                   >
                     <span>
                       {r.name}{' '}
-                      {r.labelSource !== 'plan-label' && (
-                        <span className="badge badge--amber">
-                          {r.labelSource === 'user' ? 'renamed' : 'unlabelled'}
-                        </span>
-                      )}
+                      {r.labelSource === 'user' ? (
+                        <span className="badge badge--user">renamed</span>
+                      ) : r.type === 'unknown' ? (
+                        <span className="badge badge--amber">type unknown</span>
+                      ) : r.labelSource === 'inferred' ? (
+                        <span className="badge badge--amber">unlabelled</span>
+                      ) : r.labelSource === 'ocr' ? (
+                        <span className="badge badge--read">read</span>
+                      ) : null}
                     </span>
                     <span className="muted small">{formatArea(m.area)}</span>
                   </button>

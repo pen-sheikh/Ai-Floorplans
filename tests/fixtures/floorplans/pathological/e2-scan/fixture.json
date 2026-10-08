@@ -1,0 +1,28 @@
+{
+  "id": "e2-scan",
+  "category": "pathological",
+  "annotation": "full",
+  "description": "E2 as a poor scan: blurred, noisy, grey paper, uneven lighting, specks (ground truth unchanged).",
+  "image": {
+    "derive": {
+      "from": "e2",
+      "ops": {
+        "blur": 1,
+        "noise": 12,
+        "paper": 225,
+        "contrast": 0.8,
+        "vignette": 0.25,
+        "specks": 0.0008,
+        "seed": 11
+      }
+    }
+  },
+  "groundTruth": "e2",
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minWallRecall": 0.75,
+    "minRoomDetection": 0.7,
+    "maxSeconds": 60
+  },
+  "notes": "Robustness to scan quality; bounds are regression floors."
+}

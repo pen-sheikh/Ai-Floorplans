@@ -1,0 +1,30 @@
+{
+  "id": "ballymun-flat-1965",
+  "category": "real-world",
+  "annotation": "qualitative",
+  "description": "1965 technical drawing scan: thin-line walls, title block, two flats.",
+  "image": {
+    "cache": "ballymun-flat-1965.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/f/fa/Typical_floor_plan_of_a_Ballymun_flat%2C_drawn_1965.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "40e1d2a8616bd69ee5b7b0690884e77cef3c308bbaf1e3faeb2b7c2c3142884f"
+  },
+  "source": {
+    "title": "File:Typical floor plan of a Ballymun flat, drawn 1965.png",
+    "page": "https://commons.wikimedia.org/wiki/File:Typical_floor_plan_of_a_Ballymun_flat,_drawn_1965.png",
+    "license": "Public domain",
+    "licenseUrl": null,
+    "author": "National Building Agency"
+  },
+  "truth": {
+    "rooms": 16,
+    "roomTypes": ["bedroom", "living", "kitchen", "bathroom"],
+    "labels": ["living room", "bedroom 1", "bedroom 2", "bedroom 3", "kitchen", "bathroom", "lobby"],
+    "scaleSource": "none"
+  },
+  "expect": {
+    "status": ["failed"],
+    "failureCategory": "structural_ambiguity",
+    "maxSeconds": 120
+  },
+  "notes": "Known unsupported style: thin-line walls. The extractor must say so rather than build a model."
+}

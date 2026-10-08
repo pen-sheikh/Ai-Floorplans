@@ -1,0 +1,27 @@
+{
+  "id": "synthetic-mm-photo",
+  "category": "pathological",
+  "annotation": "full",
+  "description": "The mm plan as a dim, unevenly lit photo with noise.",
+  "image": {
+    "derive": {
+      "from": "synthetic-mm",
+      "ops": {
+        "blur": 1,
+        "noise": 10,
+        "paper": 200,
+        "contrast": 0.75,
+        "vignette": 0.4,
+        "seed": 5
+      }
+    }
+  },
+  "groundTruth": "synthetic-mm",
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minWallRecall": 0.8,
+    "minRoomDetection": 0.6,
+    "maxSeconds": 60
+  },
+  "notes": "Regression floor set from the measured result (3 of 5 rooms on a dark, noisy photo)."
+}

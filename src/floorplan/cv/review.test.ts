@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { SYNTHETIC_MM_ANNOTATIONS } from '../fixtures/synthetic-mm/annotations';
-import type { ExtractionCalibrationReport } from '../extraction';
+import { EXTRACTION_ISSUE_CATEGORIES, type ExtractionCalibrationReport } from '../extraction';
 import { assessExtraction } from './review';
 
 const measured: ExtractionCalibrationReport = {
@@ -57,5 +57,54 @@ describe('assessExtraction', () => {
   it('reports printed dimensions that disagree with the drawing', () => {
     const r = assessExtraction(clean, { ...measured, samplesRejected: 2 });
     expect(r.problems.find((p) => p.code === 'dimension-mismatch')?.message).toMatch(/2 printed dimensions/);
+  });
+
+  it('accepts valid geometry with unknown rooms as ok-with-warnings, not a failure', () => {
+    const ann = {
+      ...clean,
+      rooms: clean.rooms.map((r, i) =>
+        i === 0
+          ? { ...r, name: 'Unknown Room', type: 'unknown' as const, labelSource: 'unknown' as const }
+          : r,
+      ),
+    };
+    const r = assessExtraction(ann, measured);
+    expect(r.status).toBe('ok-with-warnings');
+    const unnamed = r.problems.find((p) => p.code === 'unnamed-room');
+    expect(unnamed).toMatchObject({ category: 'room_label', impact: 'semantic-uncertainty' });
+    expect(unnamed?.message).toMatch(/valid geometry but no readable label/);
+    expect(r.components.walls.status).toBe('good');
+    expect(r.components.rooms.status).toBe('good');
+    expect(r.components.roomLabels.status).toBe('uncertain');
+  });
+
+  it('fails walls and rooms when the whole drawing is unsupported', () => {
+    const r = assessExtraction(clean, measured, {
+      stageProblems: [
+        {
+          severity: 'error',
+          code: 'thin-line-drawing',
+          category: 'structural_ambiguity',
+          impact: 'geometry-failure',
+          message: 'thin lines',
+        },
+      ],
+    });
+    expect(r.status).toBe('failed');
+    expect(r.components.walls.status).toBe('failed');
+    expect(r.components.rooms.status).toBe('failed');
+  });
+
+  it('puts every problem in the taxonomy with an impact', () => {
+    const r = assessExtraction({ ...clean, rooms: [] }, { ...measured, strategy: 'estimated', basis: 'x' });
+    for (const p of r.problems) {
+      expect(EXTRACTION_ISSUE_CATEGORIES).toContain(p.category);
+      expect([
+        'geometry-failure',
+        'geometry-uncertain',
+        'semantic-uncertainty',
+        'missing-optional',
+      ]).toContain(p.impact);
+    }
   });
 });

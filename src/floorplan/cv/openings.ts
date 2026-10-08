@@ -1,4 +1,5 @@
 import type { ThicknessProfile } from './preprocess';
+import { SegmentGrid } from './spatial';
 import type { GrayImage, Mask } from './raster';
 import {
   along,
@@ -34,6 +35,8 @@ export interface DetectedOpening {
   hinge?: 'start' | 'end';
   /** Side the leaf swings into, along the wall's left normal (+1) or the opposite (−1). */
   swingSide?: 1 | -1;
+  /** How unambiguous the hinge side and swing direction are. */
+  swingConfidence?: number;
   confidence: number;
   evidence: { door: number; window: number };
 }
@@ -89,6 +92,8 @@ interface DoorFit {
   hinge: 'start' | 'end';
   side: 1 | -1;
   radius: number;
+  /** How clearly this hinge/side beats the alternatives (0 = ambiguous, 1 = clear). */
+  swingConfidence: number;
 }
 
 /**
@@ -99,7 +104,13 @@ export function scoreDoor(ctx: OpeningContext, w: DetectedWall, from: number, to
   const g = to - from;
   const d = segDir(w);
   const n = segNormal(w);
-  let best: DoorFit = { score: 0, kind: 'hinged', hinge: 'start', side: 1, radius: g };
+  let best: DoorFit = { score: 0, kind: 'hinged', hinge: 'start', side: 1, radius: g, swingConfidence: 0 };
+  // Best score per orientation (hinge × side), to judge how clear the chosen orientation is.
+  const perOrientation = new Map<string, number>();
+  const note = (hinge: string, side: number, score: number) => {
+    const k = `${hinge}|${side}`;
+    perOrientation.set(k, Math.max(perOrientation.get(k) ?? 0, score));
+  };
   // Arc: for each angle, accept ink at ±8 % of the radius (symbols are drawn by hand, or
   // slightly elliptical). Leaf: a line from the hinge perpendicular to the wall.
   const arcScore = (hinge: Pt, toward: Pt, swing: Pt, r: number) => {
@@ -160,7 +171,9 @@ export function scoreDoor(ctx: OpeningContext, w: DetectedWall, from: number, to
         for (const f of [0.8, 0.88, 0.95, 1.02]) {
           const r = (g - px) * f;
           const score = combine(arcScore(H, toward, swing, r));
-          if (score > best.score) best = { score, kind: 'hinged', hinge, side, radius: r };
+          note(hinge, side, score);
+          if (score > best.score)
+            best = { score, kind: 'hinged', hinge, side, radius: r, swingConfidence: 0 };
         }
       }
     }
@@ -173,10 +186,16 @@ export function scoreDoor(ctx: OpeningContext, w: DetectedWall, from: number, to
         const s1 = combine(arcScore(pointAt(w, from + i1, face), d, swing, r));
         const s2 = combine(arcScore(pointAt(w, to - i2, face), mul(d, -1), swing, r));
         const score = Math.min(s1, s2);
-        if (score > best.score) best = { score, kind: 'double', hinge: 'start', side, radius: r };
+        note('both', side, score);
+        if (score > best.score)
+          best = { score, kind: 'double', hinge: 'start', side, radius: r, swingConfidence: 0 };
       }
     }
   }
+  const bestKey = `${best.kind === 'double' ? 'both' : best.hinge}|${best.side}`;
+  const alt = Math.max(0, ...[...perOrientation].filter(([k]) => k !== bestKey).map(([, v]) => v));
+  best.swingConfidence =
+    best.score > 0 ? +Math.min(1, Math.max(0, 1.5 * (1 - alt / best.score))).toFixed(3) : 0;
   return best;
 }
 
@@ -391,10 +410,17 @@ function collinear(w1: DetectedWall, w2: DetectedWall): boolean {
   return pts.every((p) => Math.abs((p.x - c.x) * n.x + (p.y - c.y) * n.y) <= dTol);
 }
 
-function findGaps(walls: DetectedWall[], profile: ThicknessProfile, wallMask: Mask): Gap[] {
+/** Gaps at the ends of `only` (default: every wall), looking for partners among all `walls`. */
+function findGaps(
+  walls: DetectedWall[],
+  profile: ThicknessProfile,
+  wallMask: Mask,
+  only: readonly DetectedWall[] = walls,
+): Gap[] {
   // Long enough for picture windows; a gap is only bridged when a symbol is found in it.
   const gapMax = 30 * profile.major;
   const gaps: Gap[] = [];
+  const grid = new SegmentGrid(walls, Math.max(24, 4 * profile.major), 2 * profile.major);
   // A gap starts where the wall FILL ends: short stubs (e.g. between a junction and a door)
   // are not always vectorised, but they are still wall.
   const trim = (g: Gap): Gap => {
@@ -413,15 +439,24 @@ function findGaps(walls: DetectedWall[], profile: ThicknessProfile, wallMask: Ma
     for (let t = g.from + 1; t < g.to - 1; t += 2, n++) if (onMask(wallMask, pointAt(g.w1, t))) filled++;
     return !n || filled / n <= 0.3;
   };
-  for (const w1 of walls) {
+  for (const w1 of only) {
     const L1 = segLength(w1);
     const d1 = segDir(w1);
     for (const end of ['a', 'b'] as const) {
       const sign = end === 'a' ? -1 : 1;
       const endT = end === 'a' ? 0 : L1;
-      // Collinear partner beyond this end.
+      // Collinear partner beyond this end (only walls in the corridor ahead can qualify).
+      const e = pointAt(w1, endT);
+      const f = pointAt(w1, endT + sign * gapMax);
+      const r = w1.thickness;
+      const ahead = grid.query({
+        x0: Math.min(e.x, f.x) - r,
+        y0: Math.min(e.y, f.y) - r,
+        x1: Math.max(e.x, f.x) + r,
+        y1: Math.max(e.y, f.y) + r,
+      });
       let bestCol: Gap | null = null;
-      for (const w2 of walls) {
+      for (const w2 of ahead) {
         if (w2 === w1) continue;
         if (Math.max(w1.thickness, w2.thickness) / Math.min(w1.thickness, w2.thickness) > 1.35) continue;
         if (!collinear(w1, w2)) continue;
@@ -455,13 +490,15 @@ function findGaps(walls: DetectedWall[], profile: ThicknessProfile, wallMask: Ma
           continue;
         }
         if (hit < 0) hit = s;
-        const host = walls.find(
-          (o) =>
-            o !== w1 &&
-            lineDistance(o, p) <= o.thickness / 2 + 1.5 &&
-            along(o, p) >= -1 &&
-            along(o, p) <= segLength(o) + 1,
-        );
+        const host = grid
+          .near(p, 2)
+          .find(
+            (o) =>
+              o !== w1 &&
+              lineDistance(o, p) <= o.thickness / 2 + 1.5 &&
+              along(o, p) >= -1 &&
+              along(o, p) <= segLength(o) + 1,
+          );
         if (!host) {
           if (s - hit > 3 * profile.major) break;
           continue;
@@ -594,6 +631,7 @@ export function detectOpenings(
         to: clear.to,
         hinge: door.hinge,
         swingSide: door.side,
+        swingConfidence: door.swingConfidence,
         confidence: +Math.min(0.97, door.score).toFixed(3),
         evidence,
       };
@@ -625,14 +663,33 @@ export function detectOpenings(
     return spans;
   };
 
-  // 1. Gaps: classify and bridge (closest gaps first, recomputing after each merge).
+  // 1. Gaps: classify and bridge, closest gaps first. A work queue: after a merge only the
+  //    changed wall's gaps are recomputed; gaps whose walls no longer exist are re-derived.
   const rejected = new Set<string>();
-  for (let guard = 0; guard < 500; guard++) {
-    const gaps = findGaps(walls, ctx.profile, ctx.wallMask)
-      .filter((g) => !rejected.has(`${g.kind}|${g.w1.id}|${g.end}|${g.w2.id}`))
-      .sort((p, q) => p.to - p.from - (q.to - q.from));
-    const g = gaps[0];
-    if (!g) break;
+  const extended = new Set<string>();
+  const width = (g: Gap) => g.to - g.from;
+  const queue: Gap[] = findGaps(walls, ctx.profile, ctx.wallMask).sort((p, q) => width(p) - width(q));
+  const enqueue = (gs: Gap[]) => {
+    for (const g of gs) {
+      let lo = 0;
+      let hi = queue.length;
+      while (lo < hi) {
+        const mid = (lo + hi) >> 1;
+        if (width(queue[mid]!) <= width(g)) lo = mid + 1;
+        else hi = mid;
+      }
+      queue.splice(lo, 0, g);
+    }
+  };
+  let alive = new Set(walls);
+  for (let guard = 0; queue.length && guard < 20 * wallsIn.length + 100; guard++) {
+    const g = queue.shift()!;
+    if (!alive.has(g.w1)) continue;
+    if (!alive.has(g.w2)) {
+      enqueue(findGaps(walls, ctx.profile, ctx.wallMask, [g.w1]).filter((h) => h.end === g.end));
+      continue;
+    }
+    if (rejected.has(`${g.kind}|${g.w1.id}|${g.end}|${g.w2.id}`)) continue;
     // A short piece of wall fill inside the gap (e.g. between a door and a window) splits it:
     // each part is classified on its own.
     const spans =
@@ -645,10 +702,25 @@ export function detectOpenings(
     const ops = classified as Omit<DetectedOpening, 'wallId' | 'id'>[];
     const op = ops[0]!;
     if (g.kind === 'collinear') {
-      mergeCollinear(g.w1, g.w2, ops);
+      const merged = mergeCollinear(g.w1, g.w2, ops);
+      alive = new Set(walls);
+      enqueue(findGaps(walls, ctx.profile, ctx.wallMask, [merged]));
     } else {
-      // Extend w1 to the centreline of the wall it meets (a T-junction) across the opening.
-      const x = intersectLines(g.w1, g.w2)!;
+      // Extend w1 to the centreline of the wall it meets (a T-junction) across the opening —
+      // once per wall end, and only if that centreline lies just past where the fill was hit
+      // (allowing for a short stub between the gap and the wall).
+      const x = intersectLines(g.w1, g.w2);
+      const endKey = `${g.w1.id}|${g.end}`;
+      const reach = x ? (g.end === 'a' ? -along(g.w1, x) : along(g.w1, x) - segLength(g.w1)) : NaN;
+      if (
+        !x ||
+        extended.has(endKey) ||
+        !(reach >= width(g) - 2 && reach <= width(g) + 3 * ctx.profile.major + g.w2.thickness)
+      ) {
+        rejected.add(`${g.kind}|${g.w1.id}|${g.end}|${g.w2.id}`);
+        continue;
+      }
+      extended.add(endKey);
       const ext = {
         ...g.w1,
         [g.end]: x,
@@ -664,6 +736,8 @@ export function detectOpenings(
         o,
       ]);
       openings.delete(g.w1);
+      alive = new Set(walls);
+      enqueue(findGaps(walls, ctx.profile, ctx.wallMask, [ext]));
     }
   }
 
@@ -718,7 +792,9 @@ export function detectOpenings(
   const typical = doorWidths.length
     ? doorWidths.sort((x, y) => x - y)[Math.floor(doorWidths.length / 2)]!
     : 3.6 * ctx.profile.major;
-  for (const w of walls) {
+  // Only when real door symbols in gaps give a reference width: without one, a plan full of
+  // linework would turn every arc-like stroke along a line into a "door".
+  for (const w of doorWidths.length >= 2 ? walls : []) {
     const L = segLength(w);
     const ops = getOps(w);
     const found: Omit<DetectedOpening, 'wallId' | 'id'>[] = [];
@@ -746,6 +822,7 @@ export function detectOpenings(
             to: t + r,
             hinge: fit.hinge,
             swingSide: fit.side,
+            swingConfidence: fit.swingConfidence,
             confidence: +(fit.score * 0.85).toFixed(3),
             evidence: { door: +fit.score.toFixed(3), window: 0 },
           });

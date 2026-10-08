@@ -73,9 +73,16 @@ export async function startExtraction(file: File): Promise<void> {
 }
 
 /** Correction: re-run with a known measurement (top calibration priority). */
-export async function rerunWithReference(
-  reference: NonNullable<ExtractionRequest['reference']>,
-): Promise<void> {
+export function rerunWithReference(reference: NonNullable<ExtractionRequest['reference']>): Promise<void> {
+  return rerun({ reference });
+}
+
+/** The document check said "not a floor plan": the user can still ask for an extraction. */
+export function rerunAnyway(): Promise<void> {
+  return rerun({ force: true });
+}
+
+async function rerun(extra: Pick<ExtractionRequest, 'reference' | 'force'>): Promise<void> {
   const { image, file, sourceId, fileName } = useExtraction.getState();
   if (!image || !sourceId || !fileName) return;
   useExtraction
@@ -92,7 +99,7 @@ export async function rerunWithReference(
         heightPx: image.height,
       },
       ...(file ? { file } : {}),
-      reference,
+      ...extra,
     });
   } catch (e) {
     fail(e);

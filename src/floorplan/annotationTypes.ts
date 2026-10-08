@@ -61,6 +61,8 @@ export interface AnnotatedDoor extends Element, AnnotatedSpan {
   hinge: 'min' | 'max';
   /** Direction the leaf swings into (as drawn by the swing arc). Ignored for 'opening'. */
   swing: PxDirection;
+  /** How sure the hinge side / swing direction is (automatic extraction). */
+  swingConfidence?: AnnotationConfidence;
   label?: string;
   /** Overrides the plan default. Heights are 'assumed' unless `heightFromPlan` is set. */
   heightMeters?: number;
@@ -111,6 +113,17 @@ export interface AnnotatedRoom extends Element {
   /** Printed room dimensions, with the drawn spans they refer to. */
   dimensions?: AnnotatedDimension[];
   exterior?: boolean;
+  /**
+   * Geometry and meaning are judged separately: a room can be certain as a space while its
+   * name or type is unknown. `confidence` (from Element) stays the overall figure.
+   */
+  geometryConfidence?: AnnotationConfidence;
+  /** How reliably the printed label was read (0 when there is none). */
+  labelConfidence?: AnnotationConfidence;
+  /** How sure the room type is, from all evidence (label, size, openings, fixtures…). */
+  classificationConfidence?: AnnotationConfidence;
+  /** Why the type was chosen, and the best guess when it was left "unknown". */
+  classification?: { evidence: string[]; suggestedType?: RoomType };
 }
 
 export type AnnotatedFixture = Element & {
@@ -169,6 +182,11 @@ export interface FloorPlanAnnotations {
   labels?: AnnotatedLabel[];
   /** Drawing artefacts the reconstruction should know about (e.g. wall fill drawn across a door). */
   drawingNotes: { id: string; message: string; rect?: PxRect }[];
+  /**
+   * Room boundaries that are not drawn walls but were closed by inference (e.g. across an open
+   * gap in the outline) so a space could be enclosed. Shown for review; never rendered as walls.
+   */
+  inferredBoundaries?: { id: string; a: PxPoint; b: PxPoint; reason: string }[];
 }
 
 /** @deprecated Use FloorPlanAnnotations. Kept so older imports keep compiling. */

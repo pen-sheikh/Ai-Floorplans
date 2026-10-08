@@ -81,11 +81,17 @@ describe('E2 automatic extraction', () => {
     expect(result.annotations.reportedArea?.m2).toBeCloseTo(57.4, 1);
   });
 
-  it('never claims more certainty than it has: what it could not resolve is flagged for review', () => {
-    expect(result.review?.status).toBe('needs-review');
-    const codes = new Set(result.review?.problems.map((p) => p.code));
-    // The kitchen doorway has no door symbol; small unlabelled cupboards are inferred.
-    expect(codes.has('unclassified-opening')).toBe(true);
-    expect(codes.has('inferred-room')).toBe(true);
+  it('judges geometry and meaning separately: geometry is fine, uncertain semantics are flagged', () => {
+    const review = result.review!;
+    // No geometry failure or geometry uncertainty: the walls, rooms and scale are good.
+    expect(review.status).toBe('ok-with-warnings');
+    expect(review.components.walls.status).toBe('good');
+    expect(review.components.rooms.status).toBe('good');
+    expect(review.components.scale.status).toBe('good');
+    // What it could not resolve is still reported, by category.
+    const codes = new Set(review.problems.map((p) => p.code));
+    expect(codes.has('unclassified-opening')).toBe(true); // kitchen doorway, no door symbol
+    expect(codes.has('inferred-room')).toBe(true); // unlabelled cupboards
+    expect(review.problems.find((p) => p.code === 'unclassified-opening')?.category).toBe('door_detection');
   });
 });

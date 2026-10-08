@@ -140,7 +140,8 @@ function validateFloor(floor: Floor, err: Report, warn: Report, ctx: ValidationC
       const a = floor.rooms[i]!;
       const b = floor.rooms[j]!;
       if (a.polygon.length < 3 || b.polygon.length < 3) continue;
-      const overlap = approximateOverlapArea(a.polygon, b.polygon);
+      // Stop once over a generous multiple of the tolerance: the message stays meaningful.
+      const overlap = approximateOverlapArea(a.polygon, b.polygon, 0.05, 50 * ROOM_OVERLAP_TOLERANCE);
       if (overlap > ROOM_OVERLAP_TOLERANCE) {
         err('room-overlap', `${a.name} and ${b.name} overlap by ≈${overlap.toFixed(2)} m².`, {
           kind: 'room',
