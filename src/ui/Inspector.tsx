@@ -133,6 +133,16 @@ function RoomInfo({ floor, roomId }: { floor: Floor; roomId: string }) {
       {room.labelSource === 'inferred' && (
         <div className="note note--warning">Not labelled on the plan — name inferred from the drawing.</div>
       )}
+      {room.type === 'unknown' && (
+        <div className="note note--warning">
+          Room type unknown
+          {room.classification?.suggestedType ? ` (perhaps ${room.classification.suggestedType})` : ''}. The
+          space is still a valid room: rename it to set its type.
+        </div>
+      )}
+      {room.labelSource === 'ocr' && (
+        <div className="note">Name read from the plan automatically — check the spelling.</div>
+      )}
       <dl className="kv">
         <dt>Area</dt>
         <dd>{formatArea(m.area)}</dd>
@@ -552,6 +562,12 @@ function EntityDetails({ floor, kind, id }: { floor: Floor; kind: EntityKind; id
       rows.push(
         ['Type', r.type],
         ['Name source', PROVENANCE_CLASS[r.labelSource]],
+        ['Geometry confidence', formatConfidence(r.geometryConfidence)],
+        ['Label confidence', formatConfidence(r.labelConfidence)],
+        ['Type confidence', formatConfidence(r.classificationConfidence)],
+        ...(r.classification?.evidence.length
+          ? ([['Type evidence', r.classification.evidence.join('; ')]] as [string, string][])
+          : []),
         ['Vertices', String(r.polygon.length)],
       );
       ({ sources, confidence } = r);

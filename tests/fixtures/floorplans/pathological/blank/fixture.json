@@ -1,0 +1,17 @@
+{
+  "id": "blank",
+  "category": "pathological",
+  "annotation": "qualitative",
+  "description": "Empty white page.",
+  "image": {
+    "generate": {
+      "kind": "blank",
+      "width": 600,
+      "height": 450
+    }
+  },
+  "expect": {
+    "status": ["failed"],
+    "maxSeconds": 20
+  }
+}

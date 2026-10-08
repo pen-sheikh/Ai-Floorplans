@@ -1,0 +1,23 @@
+{
+  "id": "hk-greenview-2bed",
+  "category": "real-world",
+  "annotation": "qualitative",
+  "description": "Phone photo of a sales poster: perspective, low contrast, Chinese labels, red dimension annotations.",
+  "image": {
+    "cache": "hk-greenview-2bed.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/a/ab/HK_CSW_Greenview_Villa_%E7%B6%A0%E6%82%A0%E9%9B%85%E8%8B%91_Showflat_%E7%A4%BA%E4%BD%8D_Tower_2_Unit_E_Two-bedroom_flat_floorplan_Jan-2013.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "b065ba0ff9dc1494f96f750f09e144481d37729f1a52e9acde4a6ea2cf5b22a9"
+  },
+  "source": {
+    "title": "File:HK CSW Greenview Villa 綠悠雅苑 Showflat 示位 Tower 2 Unit E Two-bedroom flat floorplan Jan-2013.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:HK_CSW_Greenview_Villa_%E7%B6%A0%E6%82%A0%E9%9B%85%E8%8B%91_Showflat_%E7%A4%BA%E4%BD%8D_Tower_2_Unit_E_Two-bedroom_flat_floorplan_Jan-2013.jpg",
+    "license": "CC BY-SA 3.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/3.0",
+    "author": "Heanailee"
+  },
+  "expect": {
+    "status": ["failed", "needs-review"],
+    "maxSeconds": 120
+  },
+  "notes": "Photo of a poster; must not produce a confident model."
+}

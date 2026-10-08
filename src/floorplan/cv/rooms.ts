@@ -1,6 +1,7 @@
 import { distanceTransform } from './morphology';
 import { fillConvexPolygon, newMask, type Mask } from './raster';
-import { segDir, segNormal, type DetectedWall, type Pt } from './walls';
+import { SegmentGrid } from './spatial';
+import { along, lineDistance, segDir, segLength, segNormal, type DetectedWall, type Pt } from './walls';
 
 /**
  * Room segmentation from vector walls:
@@ -44,9 +45,31 @@ export function wallPolygon(w: DetectedWall, pad = 0): Pt[] {
   ];
 }
 
-export function rasterizeWalls(walls: DetectedWall[], width: number, height: number, wallMask?: Mask): Mask {
+export function rasterizeWalls(
+  walls: DetectedWall[],
+  width: number,
+  height: number,
+  wallMask?: Mask,
+  extraBarriers: readonly { a: Pt; b: Pt; thickness: number }[] = [],
+): Mask {
   const m = newMask(width, height);
   for (const w of walls) fillConvexPolygon(m, wallPolygon(w));
+  for (const b of extraBarriers)
+    fillConvexPolygon(
+      m,
+      wallPolygon(
+        {
+          id: '',
+          a: b.a,
+          b: b.b,
+          thickness: b.thickness,
+          ends: ['free', 'free'],
+          coverage: 0,
+          confidence: 0,
+        },
+        0.5,
+      ),
+    );
   // The drawn fill closes slivers where vector corners are approximate.
   if (wallMask) for (let i = 0; i < m.data.length; i++) if (wallMask.data[i]) m.data[i] = 1;
   return m;
@@ -181,6 +204,8 @@ function areaOf(poly: Pt[]): number {
 }
 
 export interface RoomSegmentationOptions {
+  /** Inferred boundaries (closing open gaps) used as barriers; never treated as walls. */
+  extraBarriers?: readonly { a: Pt; b: Pt; thickness: number }[];
   /** Smallest room kept, px² (default (2 × major thickness)²). */
   minAreaPx?: number;
 }
@@ -193,7 +218,7 @@ export function segmentRooms(
   wallMask?: Mask,
   opts: RoomSegmentationOptions = {},
 ): RoomSegmentation {
-  const barrier = rasterizeWalls(walls, width, height, wallMask);
+  const barrier = rasterizeWalls(walls, width, height, wallMask, opts.extraBarriers);
   const free = newMask(width, height);
   for (let i = 0; i < free.data.length; i++) free.data[i] = barrier.data[i] ? 0 : 1;
   // 4-connectivity for free space so diagonal pixel gaps in walls do not leak.
@@ -309,4 +334,115 @@ function deepestPoint(
     }
   }
   return best;
+}
+
+export interface InferredBoundary {
+  a: Pt;
+  b: Pt;
+  /** Length of the closed gap, pixels. */
+  gapPx: number;
+  fromWall: string;
+  toWall?: string;
+}
+
+/**
+ * Real plans leave room boundaries open: partitions that stop short of the wall opposite,
+ * doorways without door symbols, outlines interrupted by symbols or unrecognised openings.
+ * Topology closes them: each free wall end (one that meets no other wall) is joined to the
+ * wall straight ahead or to another free end ahead, within a reach of a few metres expressed
+ * in wall thicknesses, as long as the closing line does not cross drawn walls. The closures
+ * are inferences — the caller keeps only those that separate spaces, reports them, and lowers
+ * the geometry confidence of the rooms they bound.
+ */
+export function inferBoundaries(
+  walls: DetectedWall[],
+  major: number,
+  wallMask: Mask,
+  reachPx = 12 * major,
+): InferredBoundary[] {
+  const grid = new SegmentGrid(walls, Math.max(24, 4 * major), reachPx);
+  const meets = (w: DetectedWall, p: Pt) =>
+    grid
+      .near(p, major)
+      .some(
+        (o) =>
+          o !== w &&
+          lineDistance(o, p) <= o.thickness / 2 + w.thickness / 2 + 2 &&
+          along(o, p) >= -o.thickness &&
+          along(o, p) <= segLength(o) + o.thickness,
+      );
+  const free: { w: DetectedWall; p: Pt; dir: Pt }[] = [];
+  for (const w of walls) {
+    const d = segDir(w);
+    if (!meets(w, w.a)) free.push({ w, p: w.a, dir: { x: -d.x, y: -d.y } });
+    if (!meets(w, w.b)) free.push({ w, p: w.b, dir: d });
+  }
+  // A closing line must not run through drawn walls (other than where it starts and ends).
+  const clear = (a: Pt, b: Pt, pad: number) => {
+    const L = Math.hypot(b.x - a.x, b.y - a.y);
+    for (let t = pad; t <= L - pad; t += 2) {
+      const x = Math.floor(a.x + ((b.x - a.x) * t) / L);
+      const y = Math.floor(a.y + ((b.y - a.y) * t) / L);
+      if (
+        x >= 0 &&
+        y >= 0 &&
+        x < wallMask.width &&
+        y < wallMask.height &&
+        wallMask.data[y * wallMask.width + x]
+      )
+        return false;
+    }
+    return true;
+  };
+  const out: InferredBoundary[] = [];
+  const pairedEnds = new Set<string>();
+  for (const f of free) {
+    const key = `${f.w.id}|${f.p.x}|${f.p.y}`;
+    if (pairedEnds.has(key)) continue;
+    let best: InferredBoundary | null = null;
+    // (a) Another free end ahead (within ±35° of the wall's direction).
+    for (const g of free) {
+      if (g === f || g.w === f.w) continue;
+      const dx = g.p.x - f.p.x;
+      const dy = g.p.y - f.p.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist < 2 || dist > reachPx) continue;
+      // Nearly straight ahead of the wall (±15°), or — for corner gaps such as a window turning the corner —
+      // any nearly horizontal/vertical line that does not lead back behind the wall.
+      const ahead = (dx * f.dir.x + dy * f.dir.y) / dist >= Math.cos((15 * Math.PI) / 180);
+      const axial =
+        Math.min(Math.abs(dx), Math.abs(dy)) / dist <= Math.sin((10 * Math.PI) / 180) &&
+        dx * f.dir.x + dy * f.dir.y > -0.2 * dist;
+      if (!ahead && !axial) continue;
+      if (!clear(f.p, g.p, Math.max(f.w.thickness, g.w.thickness))) continue;
+      if (!best || dist < best.gapPx)
+        best = { a: f.p, b: g.p, gapPx: dist, fromWall: f.w.id, toWall: g.w.id };
+    }
+    // (b) The wall straight ahead.
+    for (let s = 2; s <= reachPx && (!best || s < best.gapPx); s += 1) {
+      const q = { x: f.p.x + f.dir.x * s, y: f.p.y + f.dir.y * s };
+      const host = grid
+        .near(q, major)
+        .find(
+          (o) =>
+            o !== f.w &&
+            lineDistance(o, q) <= o.thickness / 2 + 0.5 &&
+            along(o, q) >= 0 &&
+            along(o, q) <= segLength(o),
+        );
+      if (!host) continue;
+      if (Math.abs(segDir(host).x * f.dir.x + segDir(host).y * f.dir.y) > 0.9) break; // runs alongside: not a closure
+      if (clear(f.p, q, f.w.thickness)) best = { a: f.p, b: q, gapPx: s, fromWall: f.w.id, toWall: host.id };
+      break;
+    }
+    if (!best) continue;
+    if (best.toWall) {
+      const other = free.find(
+        (g) => g.w.id === best!.toWall && Math.hypot(g.p.x - best!.b.x, g.p.y - best!.b.y) < 1,
+      );
+      if (other) pairedEnds.add(`${other.w.id}|${other.p.x}|${other.p.y}`);
+    }
+    out.push(best);
+  }
+  return out;
 }

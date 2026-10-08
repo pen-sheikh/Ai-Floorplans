@@ -2,12 +2,13 @@ import type { Provenance } from './types';
 import { formatLength } from './units';
 
 /** How a provenance is presented to people: the four categories plus user edits. */
-export type ProvenanceClass = 'known' | 'measured' | 'estimated' | 'inferred' | 'assumed' | 'user';
+export type ProvenanceClass = 'known' | 'read' | 'measured' | 'estimated' | 'inferred' | 'assumed' | 'user';
 
 export const PROVENANCE_CLASS: Record<Provenance, ProvenanceClass> = {
   'plan-label': 'known',
   'plan-geometry': 'measured',
   detected: 'estimated',
+  ocr: 'read',
   estimated: 'estimated',
   inferred: 'inferred',
   assumed: 'assumed',
@@ -16,6 +17,7 @@ export const PROVENANCE_CLASS: Record<Provenance, ProvenanceClass> = {
 
 export const PROVENANCE_HELP: Record<ProvenanceClass, string> = {
   known: 'Printed on the plan',
+  read: 'Read from the plan automatically (OCR) — the reading may contain errors',
   measured: 'Measured from the drawing at the calibrated scale',
   estimated: 'Estimated (automatic detection or uncalibrated scale)',
   inferred: 'Inferred from drawing conventions',

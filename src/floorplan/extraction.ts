@@ -31,7 +31,15 @@ export interface FloorPlanSource {
 }
 
 export type ExtractionStageName =
-  'preprocess' | 'walls' | 'openings' | 'rooms' | 'text' | 'dimensions' | 'calibration' | 'annotations';
+  | 'document'
+  | 'preprocess'
+  | 'walls'
+  | 'openings'
+  | 'rooms'
+  | 'text'
+  | 'dimensions'
+  | 'calibration'
+  | 'annotations';
 
 export interface ExtractionStageReport {
   stage: ExtractionStageName;
@@ -61,18 +69,86 @@ export interface ExtractionCalibrationReport {
   samplesRejected: number;
 }
 
+/**
+ * Failure taxonomy: every problem has a machine-readable category, so a corpus run can count
+ * which failures dominate.
+ */
+export type ExtractionIssueCategory =
+  | 'wall_detection'
+  | 'room_detection'
+  | 'room_boundary'
+  | 'room_label'
+  | 'room_classification'
+  | 'door_detection'
+  | 'window_detection'
+  | 'scale'
+  | 'annotation_conflict'
+  | 'unsupported_symbol'
+  | 'image_quality'
+  | 'structural_ambiguity';
+
+export const EXTRACTION_ISSUE_CATEGORIES: readonly ExtractionIssueCategory[] = [
+  'wall_detection',
+  'room_detection',
+  'room_boundary',
+  'room_label',
+  'room_classification',
+  'door_detection',
+  'window_detection',
+  'scale',
+  'annotation_conflict',
+  'unsupported_symbol',
+  'image_quality',
+  'structural_ambiguity',
+];
+
+/**
+ * What a problem means for using the result:
+ *  - geometry-failure: no valid 3D model can be built (blocks acceptance);
+ *  - geometry-uncertain: geometry exists but may be wrong (a person must look first);
+ *  - semantic-uncertainty: geometry is fine; names/types/symbols are uncertain;
+ *  - missing-optional: information the plan (or extractor) does not provide.
+ */
+export type IssueImpact =
+  'geometry-failure' | 'geometry-uncertain' | 'semantic-uncertainty' | 'missing-optional';
+
 export interface ReviewProblem {
   severity: 'error' | 'warning' | 'info';
   code: string;
+  category: ExtractionIssueCategory;
+  impact: IssueImpact;
   message: string;
   elementId?: string;
   elementIds?: string[];
 }
 
-/** failed: cannot be reconstructed; needs-review: usable only after a person checks it. */
+export type ExtractionComponent = 'walls' | 'rooms' | 'roomLabels' | 'doors' | 'windows' | 'scale';
+
+export interface ComponentAssessment {
+  /** good: usable as is; uncertain: usable, check it; missing: not found; failed: unusable. */
+  status: 'good' | 'uncertain' | 'missing' | 'failed';
+  confidence: number;
+  summary: string;
+}
+
+/** "Is this probably a floor plan?" — never a certainty. */
+export interface DocumentCheck {
+  verdict: 'LIKELY_FLOOR_PLAN' | 'UNCERTAIN' | 'UNLIKELY_FLOOR_PLAN';
+  confidence: number;
+  evidence: string[];
+}
+
+/**
+ * failed: geometry is unusable — no model is built;
+ * needs-review: geometry is usable but uncertain — a person must confirm before use;
+ * ok-with-warnings: geometry is fine, some semantics are uncertain or missing;
+ * ok: nothing to review.
+ */
 export interface ExtractionReview {
-  status: 'ok' | 'needs-review' | 'failed';
+  status: 'ok' | 'ok-with-warnings' | 'needs-review' | 'failed';
   problems: ReviewProblem[];
+  components: Record<ExtractionComponent, ComponentAssessment>;
+  document?: DocumentCheck;
 }
 
 export interface ExtractionResult {

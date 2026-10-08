@@ -1,0 +1,19 @@
+{
+  "id": "synthetic-corridor",
+  "category": "synthetic",
+  "annotation": "full",
+  "description": "Rendered from its ground-truth annotations by scripts/render-test-plans.ts.",
+  "image": {
+    "path": "floor-plans/test/synthetic-corridor.png"
+  },
+  "groundTruth": "synthetic-corridor",
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minWallRecall": 1,
+    "minRoomDetection": 1,
+    "minDoorRecall": 1,
+    "minWindowRecall": 1,
+    "maxScaleError": 0.02,
+    "maxSeconds": 60
+  }
+}

@@ -234,28 +234,49 @@ export function reconstructApartment(ann: FloorPlanAnnotations, options: Reconst
     assume('window-heights', 'Window sill–head heights (not shown on plan)', [...ranges].join(', '));
   }
 
-  // 5. Rooms.
+  // 5. Rooms. Geometry and meaning are kept apart: a room with a valid outline is a room, even
+  //    when its name or type is unknown. Automatically read names are "ocr", never "printed".
   const rooms: Room[] = ann.rooms.map((r) => {
+    const unknown = r.labelSource === 'unknown';
     if (r.labelSource !== 'plan-label') {
       notes.push({
         code: 'room-label-inferred',
         severity: 'info',
         entityId: r.id,
-        message: r.note ?? `"${r.name}" is not labelled on the plan; name inferred from the drawing.`,
+        message:
+          r.note ??
+          (unknown
+            ? `${r.id} has no readable label; kept as "Unknown Room".`
+            : `"${r.name}" is not labelled on the plan; name inferred from the drawing.`),
       });
     }
-    const unknown = r.labelSource === 'unknown';
+    const automatic = ann.source.method === 'automatic';
+    const labelSource: Provenance =
+      r.labelSource === 'plan-label' ? (automatic ? 'ocr' : 'plan-label') : 'inferred';
+    const typeSource: Provenance | undefined =
+      unknown || r.type === 'unknown' ? undefined : r.labelSource === 'plan-label' ? labelSource : 'inferred';
     return {
       id: r.id,
       name: unknown ? 'Unknown Room' : r.name,
       type: unknown ? 'unknown' : r.type,
-      labelSource: r.labelSource === 'plan-label' ? 'plan-label' : 'inferred',
+      labelSource,
       ...(r.label ? { planLabel: r.label } : {}),
       polygon: r.polygon.map((p) => planToWorld(p, t)),
       ceilingHeight,
       exterior: r.exterior ?? false,
-      sources: { geometry, ceilingHeight: 'assumed' },
+      sources: {
+        geometry,
+        ceilingHeight: 'assumed',
+        ...(automatic && !unknown ? { name: labelSource } : {}),
+        ...(automatic && typeSource ? { type: typeSource } : {}),
+      },
       ...confidence(r.confidence),
+      ...(r.geometryConfidence !== undefined ? { geometryConfidence: r.geometryConfidence } : {}),
+      ...(r.labelConfidence !== undefined ? { labelConfidence: r.labelConfidence } : {}),
+      ...(r.classificationConfidence !== undefined
+        ? { classificationConfidence: r.classificationConfidence }
+        : {}),
+      ...(r.classification ? { classification: r.classification } : {}),
       wallIds: [],
       doorIds: [],
       windowIds: [],

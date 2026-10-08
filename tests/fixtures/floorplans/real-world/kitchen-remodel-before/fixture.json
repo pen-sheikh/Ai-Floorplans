@@ -1,0 +1,29 @@
+{
+  "id": "kitchen-remodel-before",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "Inverted colours: white walls on a grey ground, dotted zone lines, large labels.",
+  "image": {
+    "cache": "kitchen-remodel-before.png",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/0/0f/Kitchen_Remodel_Floor_Plan_Before.svg/1920px-Kitchen_Remodel_Floor_Plan_Before.svg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "sha256": "d5e1502da5acd9b316621223797f03c76f2bd6f1842c04823aa12b9bd9a4cc58"
+  },
+  "source": {
+    "title": "File:Kitchen Remodel Floor Plan Before.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:Kitchen_Remodel_Floor_Plan_Before.svg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Stilfehler"
+  },
+  "truth": {
+    "rooms": 8,
+    "roomTypes": ["kitchen", "dining", "storage"],
+    "labels": ["Breakfast", "Pantry", "Kitchen", "Courtyard", "Dining"],
+    "scaleSource": "none"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 2,
+    "maxSeconds": 90
+  }
+}

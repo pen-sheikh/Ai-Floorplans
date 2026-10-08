@@ -36,7 +36,15 @@ export interface Vec2 {
  * | `user`          | Entered or changed by a user                               | user      |
  */
 export type Provenance =
-  'plan-label' | 'plan-geometry' | 'detected' | 'estimated' | 'inferred' | 'assumed' | 'user';
+  | 'plan-label'
+  | 'plan-geometry'
+  | 'detected'
+  /** Text read from the plan automatically (OCR): printed, but the reading may be wrong. */
+  | 'ocr'
+  | 'estimated'
+  | 'inferred'
+  | 'assumed'
+  | 'user';
 
 /**
  * Per-property provenance for an entity. Geometry measured from a plan and heights assumed
@@ -203,8 +211,18 @@ export interface Room {
   ceilingHeight: number;
   /** Open to the sky (balcony/terrace): no ceiling. */
   exterior: boolean;
-  sources: Sources<'geometry' | 'ceilingHeight'>;
+  /** `name` / `type` are recorded when they came from automatic reading or classification. */
+  sources: Sources<'geometry' | 'ceilingHeight'> & Partial<Sources<'name' | 'type'>>;
   confidence?: Confidence;
+  /**
+   * Geometry and meaning are separate: a room can be a certain space with an unknown name.
+   * (`confidence` above stays the overall figure.)
+   */
+  geometryConfidence?: Confidence;
+  labelConfidence?: Confidence;
+  classificationConfidence?: Confidence;
+  /** Evidence for the type, and the best guess when the type was left unknown. */
+  classification?: { evidence: string[]; suggestedType?: RoomType };
   /** Derived references (rebuilt by `deriveRoomRefs`). */
   wallIds: string[];
   doorIds: string[];

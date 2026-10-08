@@ -1,0 +1,23 @@
+{
+  "id": "floor-plan-01",
+  "category": "real-world",
+  "annotation": "qualitative",
+  "description": "Phone photo of a hand-drawn, coloured student plan, rotated, with grid lines.",
+  "image": {
+    "cache": "floor-plan-01.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/f/f3/Floor_plan01.jpg/1920px-Floor_plan01.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "sha256": "116684edafbad5cb3b4b268b16538bbd1d0fea1cc24971d7ffe37aeb1bfb6142"
+  },
+  "source": {
+    "title": "File:Floor plan01.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:Floor_plan01.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Bajoga2021"
+  },
+  "expect": {
+    "status": ["failed", "needs-review"],
+    "maxSeconds": 120
+  },
+  "notes": "Photo at an angle; must not produce a confident model."
+}

@@ -266,7 +266,13 @@ export function polygonContainsPolygon(outer: readonly Vec2[], inner: readonly V
  * Approximate overlap area of two simple polygons by sampling a grid over the smaller
  * polygon's bounds. Adequate for validation (detecting rooms that overlap noticeably).
  */
-export function approximateOverlapArea(a: readonly Vec2[], b: readonly Vec2[], cell = 0.05): number {
+export function approximateOverlapArea(
+  a: readonly Vec2[],
+  b: readonly Vec2[],
+  cell = 0.05,
+  /** Stop counting once the overlap is known to exceed this (m²). */
+  stopAbove = Infinity,
+): number {
   const ba = polygonBounds(a);
   const bb = polygonBounds(b);
   const minX = Math.max(ba.minX, bb.minX);
@@ -274,11 +280,14 @@ export function approximateOverlapArea(a: readonly Vec2[], b: readonly Vec2[], c
   const minZ = Math.max(ba.minZ, bb.minZ);
   const maxZ = Math.min(ba.maxZ, bb.maxZ);
   if (minX >= maxX || minZ >= maxZ) return 0;
+  // At most ~10 000 samples, however large the overlap region is.
+  cell = Math.max(cell, Math.sqrt(((maxX - minX) * (maxZ - minZ)) / 10000));
   let count = 0;
   for (let x = minX + cell / 2; x < maxX; x += cell) {
     for (let z = minZ + cell / 2; z < maxZ; z += cell) {
       const p = vec(x, z);
-      if (pointStrictlyInPolygon(p, a) && pointStrictlyInPolygon(p, b)) count++;
+      if (pointStrictlyInPolygon(p, a) && pointStrictlyInPolygon(p, b) && ++count * cell * cell > stopAbove)
+        return count * cell * cell;
     }
   }
   return count * cell * cell;

@@ -1,0 +1,23 @@
+{
+  "id": "coloured-3d-render",
+  "category": "real-world",
+  "annotation": "qualitative",
+  "description": "Photorealistic 3D render of a flat seen from above, not a drawn plan.",
+  "image": {
+    "cache": "coloured-3d-render.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/7/70/3d-design-floor-plan-coloured.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "14afeedf5bbe29fb5ed351e79556c19e93a6b9e3fb346e8971ad0f2dc847ac02"
+  },
+  "source": {
+    "title": "File:3d-design-floor-plan-coloured.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:3d-design-floor-plan-coloured.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Tallbox"
+  },
+  "expect": {
+    "status": ["failed", "needs-review"],
+    "maxSeconds": 120
+  },
+  "notes": "Not a 2D plan; must not produce a confident model."
+}

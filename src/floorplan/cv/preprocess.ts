@@ -1,6 +1,7 @@
 import { connectedComponents, distanceTransform, selectComponents, skeletonize } from './morphology';
 import {
   histogram,
+  newMask,
   normalizeContrast,
   otsu,
   threshold,
@@ -17,18 +18,124 @@ export interface Preprocessed {
   inkThreshold: number;
   /** Distance to nearest non-ink pixel, for every ink pixel. */
   inkDistance: Float32Array;
+  /** Coloured areas that were treated as paper (fills, tints, coloured symbols). */
+  tint: Mask;
 }
 
 /**
- * Grayscale → contrast normalisation → global (Otsu) ink threshold → distance transform.
+ * Grayscale (colour areas as paper) → background flattening when the paper is not clean →
+ * contrast normalisation → global (Otsu) ink threshold → distance transform.
  * Kept independent of what the ink represents; later stages decide.
  */
 export function preprocessImage(img: RgbaImage): Preprocessed {
-  const gray = normalizeContrast(toGray(img));
+  const tint = newMask(img.width, img.height);
+  let base = normalisePolarity(suppressColour(img, toGray(img), 45, 70, tint));
+  if (paperFraction(base) < 0.5)
+    base = flattenBackground(base, Math.max(25, Math.round(0.03 * Math.min(img.width, img.height))));
+  const gray = normalizeContrast(base);
   // Otsu separates paper from ink. Clamp: very clean renders have bimodal 0/255 histograms.
   const t = Math.min(200, Math.max(60, otsu(histogram(gray))));
   const ink = threshold(gray, t);
-  return { gray, ink, inkThreshold: t, inkDistance: distanceTransform(ink) };
+  return { gray, ink, inkThreshold: t, inkDistance: distanceTransform(ink), tint };
+}
+
+/**
+ * Structure (walls, openings, linework) is drawn in black or grey on almost every plan; colour
+ * is used for floor finishes, room tints, furniture shading and coloured annotations. Strongly
+ * coloured pixels are therefore treated as paper — unless they are very dark (dark fills still
+ * count as ink). Greyscale plans are unaffected.
+ */
+export function suppressColour(
+  img: RgbaImage,
+  gray: GrayImage,
+  minChroma = 45,
+  keepBelow = 70,
+  suppressed?: Mask,
+): GrayImage {
+  const { width: W, height: H } = gray;
+  const d = img.data;
+  const coloured = new Uint8Array(W * H);
+  for (let i = 0, p = 0; i < coloured.length; i++, p += 4) {
+    const chroma = Math.max(d[p]!, d[p + 1]!, d[p + 2]!) - Math.min(d[p]!, d[p + 1]!, d[p + 2]!);
+    coloured[i] = chroma >= minChroma && gray.data[i]! >= keepBelow ? 1 : 0;
+  }
+  // Only coloured AREAS: an isolated fringe (anti-aliased text, thin coloured lines) stays.
+  const out = new Uint8Array(gray.data);
+  for (let y = 1; y < H - 1; y++) {
+    for (let x = 1; x < W - 1; x++) {
+      const i = y * W + x;
+      if (coloured[i] && coloured[i - 1] && coloured[i + 1] && coloured[i - W] && coloured[i + W]) {
+        out[i] = 255;
+        if (suppressed) suppressed.data[i] = 1;
+      }
+    }
+  }
+  return { width: W, height: H, data: out };
+}
+
+/**
+ * Most plans draw dark ink on light paper; some (exports, presentation plans) draw white walls
+ * on a grey or dark ground. When the background is not white and the drawing is mostly brighter
+ * than it, ink is measured as distance from the background level, in either direction.
+ */
+export function normalisePolarity(g: GrayImage): GrayImage {
+  const h = histogram(g);
+  let bg = 0;
+  for (let v = 1; v < 256; v++) if (h[v]! > h[bg]!) bg = v;
+  if (bg >= 225) return g;
+  let brighter = 0;
+  let darker = 0;
+  for (let v = Math.min(255, bg + 30); v < 256; v++) brighter += h[v]!;
+  for (let v = 0; v <= bg - 30; v++) darker += h[v]!;
+  // A grey scan or photo still has far more dark ink than bright highlights (lighting, glare):
+  // only a drawing whose deviation from the ground is mostly brighter is inverted.
+  if (brighter < 0.02 * g.data.length || brighter <= darker) return g;
+  const out = new Uint8Array(g.data.length);
+  // Scaled so that a wall as far from the ground as the brighter side allows becomes full ink.
+  const k = 255 / Math.max(30, Math.min(bg, 255 - bg));
+  for (let i = 0; i < out.length; i++)
+    out[i] = 255 - Math.min(255, Math.round(Math.abs(g.data[i]! - bg) * k));
+  return { width: g.width, height: g.height, data: out };
+}
+
+const paperFraction = (g: GrayImage) => {
+  let n = 0;
+  for (let i = 0; i < g.data.length; i++) if (g.data[i]! >= 225) n++;
+  return n / g.data.length;
+};
+
+/** Sliding-window maximum along rows or columns (van Herk / Gil–Werman): O(n), any radius. */
+function maxFilter1d(src: Uint8Array, W: number, H: number, r: number, horizontal: boolean): Uint8Array {
+  const out = new Uint8Array(src.length);
+  const n = horizontal ? W : H;
+  const lines = horizontal ? H : W;
+  const k = 2 * r + 1;
+  const g = new Uint8Array(n + k);
+  const h = new Uint8Array(n + k);
+  const at = (line: number, i: number) => (horizontal ? line * W + i : i * W + line);
+  for (let line = 0; line < lines; line++) {
+    const v = (i: number) => (i < 0 || i >= n ? 0 : src[at(line, i)]!);
+    // Prefix/suffix maxima over blocks of length k, on the line padded by r each side.
+    for (let i = 0; i < n + k - 1; i++) g[i] = i % k === 0 ? v(i - r) : Math.max(g[i - 1]!, v(i - r));
+    for (let i = n + k - 2; i >= 0; i--)
+      h[i] = i % k === k - 1 || i === n + k - 2 ? v(i - r) : Math.max(h[i + 1]!, v(i - r));
+    for (let i = 0; i < n; i++) out[at(line, i)] = Math.max(h[i]!, g[i + k - 1]!);
+  }
+  return out;
+}
+
+/**
+ * Photographs and tinted scans have uneven, non-white paper. Estimate the paper level with a
+ * large maximum filter (ink is thinner than the window) and divide it out, so the paper becomes
+ * white and the drawing keeps its contrast. Linear time.
+ */
+export function flattenBackground(g: GrayImage, radius: number): GrayImage {
+  const { width: W, height: H } = g;
+  const bg = maxFilter1d(maxFilter1d(g.data, W, H, radius, true), W, H, radius, false);
+  const out = new Uint8Array(g.data.length);
+  for (let i = 0; i < out.length; i++)
+    out[i] = Math.min(255, Math.round((255 * g.data[i]!) / Math.max(1, bg[i]!)));
+  return { width: W, height: H, data: out };
 }
 
 export interface ThicknessProfile {

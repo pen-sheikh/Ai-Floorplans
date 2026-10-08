@@ -31,6 +31,8 @@ export interface ExtractionRequest {
   /** Corrections from the user: a known measurement, or a typed-in scale. */
   reference?: CvExtractionOptions['reference'];
   pixelsPerMeter?: number;
+  /** Extract even if the image does not look like a floor plan (the user asked to try anyway). */
+  force?: boolean;
 }
 
 export type ProgressFn = (stage: ExtractionStageName, message: string) => void;
@@ -52,6 +54,7 @@ export class LocalExtractionService implements FloorPlanExtractionService {
       ocr: this.ocr(),
       ...(req.reference ? { reference: req.reference } : {}),
       ...(req.pixelsPerMeter ? { pixelsPerMeter: req.pixelsPerMeter } : {}),
+      ...(req.force ? { force: true } : {}),
       ...(onProgress ? { onProgress } : {}),
     });
   }

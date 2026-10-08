@@ -1,0 +1,21 @@
+{
+  "id": "e2-low-res",
+  "category": "pathological",
+  "annotation": "full",
+  "description": "E2 at half resolution (ground truth scaled with it).",
+  "image": {
+    "derive": {
+      "from": "e2",
+      "ops": {
+        "scale": 0.5
+      }
+    }
+  },
+  "groundTruth": "e2",
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minWallRecall": 0.75,
+    "minRoomDetection": 0.7,
+    "maxSeconds": 60
+  }
+}

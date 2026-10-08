@@ -1,0 +1,31 @@
+{
+  "id": "bungalow-2bhk",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "Indian 2BHK plan: textured floors, furniture, imperial room sizes in feet and inches.",
+  "image": {
+    "cache": "bungalow-2bhk.jpg",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/6/61/2_bhk_Bungalow_floor_plan.jpg/1920px-2_bhk_Bungalow_floor_plan.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "sha256": "9eafc3d0ea75ab11eeebc982ea57230bf93e2a01eaef9b3e5b85a0ef8efa9fee"
+  },
+  "source": {
+    "title": "File:2 bhk Bungalow floor plan.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:2_bhk_Bungalow_floor_plan.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Jithurad4539"
+  },
+  "truth": {
+    "rooms": 10,
+    "roomTypes": ["bedroom", "bathroom", "toilet", "kitchen", "living", "dining", "utility"],
+    "labels": ["UTILITY", "KITCHEN", "LIVING ROOM", "DINING", "BATH", "TOILET", "BED ROOM", "ENT. LOBBY"],
+    "scaleSource": "printed"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 6,
+    "roomTypes": ["bedroom", "kitchen"],
+    "scaleStrategy": "dimension-labels",
+    "maxSeconds": 60
+  }
+}

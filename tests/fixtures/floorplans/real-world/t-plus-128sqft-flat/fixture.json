@@ -1,0 +1,28 @@
+{
+  "id": "t-plus-128sqft-flat",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "Micro-flat (SVG export): Chinese labels, windows drawn as cyan bands, dimensions in metres (米).",
+  "image": {
+    "cache": "t-plus-128sqft-flat.png",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/9/9f/T_PLUS_Floor_Plan_%28128_Sq_Ft_Flat%29.svg/1920px-T_PLUS_Floor_Plan_%28128_Sq_Ft_Flat%29.svg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "sha256": "04aa9127f2095c25e8cbcba3603bf8d2d3233eabf4fcaa75adba4b915eaa2658"
+  },
+  "source": {
+    "title": "File:T PLUS Floor Plan (128 Sq Ft Flat).svg",
+    "page": "https://commons.wikimedia.org/wiki/File:T_PLUS_Floor_Plan_(128_Sq_Ft_Flat).svg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Momocalbee"
+  },
+  "truth": {
+    "rooms": 2,
+    "roomTypes": ["living", "bathroom"],
+    "scaleSource": "printed"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 1,
+    "maxSeconds": 60
+  }
+}

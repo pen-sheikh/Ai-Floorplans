@@ -1,0 +1,50 @@
+{
+  "id": "schmidt-lademann-house",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "Two-storey house (SVG export): grey filled walls mixed with single-line walls, long glazing runs.",
+  "image": {
+    "cache": "schmidt-lademann-house.png",
+    "url": "https://thumb.wikimedia.org/wikipedia/commons/thumb/2/26/Schmidt-Lademann_house_floor_plan.svg/1920px-Schmidt-Lademann_house_floor_plan.svg.png?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=thumbnail",
+    "sha256": "b80354815a69fd3a98918fa0467c214684e7a58b1b7ebed2317343ed6088a931"
+  },
+  "source": {
+    "title": "File:Schmidt-Lademann house floor plan.svg",
+    "page": "https://commons.wikimedia.org/wiki/File:Schmidt-Lademann_house_floor_plan.svg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Frank-Peter Schmidt-Lademann"
+  },
+  "truth": {
+    "rooms": 18,
+    "roomTypes": [
+      "bedroom",
+      "bathroom",
+      "toilet",
+      "kitchen",
+      "living",
+      "dining",
+      "hall",
+      "utility",
+      "balcony"
+    ],
+    "labels": [
+      "BED R.",
+      "STUDY",
+      "KITCHEN",
+      "LAUNDRY",
+      "WC",
+      "LIVING R.",
+      "DINING",
+      "ENTRY",
+      "SLEEPOUT",
+      "BALCONY"
+    ],
+    "scaleSource": "none"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 3,
+    "maxSeconds": 60
+  }
+}

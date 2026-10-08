@@ -16,7 +16,13 @@ export function RoomSurfaces() {
   const hovered = useScene((s) => (s.hover?.kind === 'room' ? s.hover.id : null));
   return (
     <group name="rooms">
-      <Slab footprint={footprint} />
+      {/* A floor plan need not draw a floor: without a usable outline the slab is derived
+          from the room polygons (each room's floor comes from its polygon anyway). */}
+      {footprint.length >= 3 ? (
+        <Slab footprint={footprint} />
+      ) : (
+        rooms.map((room) => <Slab key={`slab-${room.id}`} footprint={room.polygon} />)
+      )}
       {rooms.map((room) => (
         <RoomSurface
           key={room.id}

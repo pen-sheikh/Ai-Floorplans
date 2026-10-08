@@ -1,0 +1,29 @@
+{
+  "id": "grove-1bed-flat",
+  "category": "real-world",
+  "annotation": "partial",
+  "description": "Watercolour sales plan, small image (397 px wide).",
+  "image": {
+    "cache": "grove-1bed-flat.jpg",
+    "url": "https://upload.wikimedia.org/wikipedia/commons/b/b4/The_Grove_Floorplan_1_Bedroom_Flat_68sqm.jpg?utm_source=commons.wikimedia.org&utm_campaign=imageinfo&utm_content=original",
+    "sha256": "b39a7f228a82d10cc7a8d370e7e0616dc3361151df1b9a656e98853da356002a"
+  },
+  "source": {
+    "title": "File:The Grove Floorplan 1 Bedroom Flat 68sqm.jpg",
+    "page": "https://commons.wikimedia.org/wiki/File:The_Grove_Floorplan_1_Bedroom_Flat_68sqm.jpg",
+    "license": "CC BY-SA 4.0",
+    "licenseUrl": "https://creativecommons.org/licenses/by-sa/4.0",
+    "author": "Rockwell Land"
+  },
+  "truth": {
+    "rooms": 8,
+    "roomTypes": ["bedroom", "bathroom", "kitchen", "living", "balcony"],
+    "labels": ["balcony", "master bedroom", "living", "dining", "t&b", "kitchen", "den"],
+    "scaleSource": "none"
+  },
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minRooms": 3,
+    "maxSeconds": 60
+  }
+}

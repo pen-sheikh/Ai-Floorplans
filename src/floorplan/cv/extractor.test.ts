@@ -32,7 +32,15 @@ describe('extractFromImage (rasterised plans, fake OCR)', () => {
   it('reports progress for every stage, in order', async () => {
     const seen: string[] = [];
     const r = await extractFromImage(mmImage, source('mm'), { onProgress: (stage) => seen.push(stage) });
-    expect(seen).toEqual(['preprocess', 'walls', 'openings', 'rooms', 'calibration', 'annotations']);
+    expect(seen).toEqual([
+      'preprocess',
+      'document',
+      'walls',
+      'openings',
+      'rooms',
+      'calibration',
+      'annotations',
+    ]);
     expect(r.stages.find((s) => s.stage === 'text')?.status).toBe('skipped');
     expect(r.stages.every((s) => s.status === 'skipped' || typeof s.ms === 'number')).toBe(true);
   });
@@ -80,8 +88,8 @@ describe('calibration strategy priority', () => {
     const r = await extractFromImage(img, source('c'), {});
     expect(r.calibration?.strategy).toBe('estimated');
     expect(r.calibration?.confidence).toBe('low');
-    expect(r.calibration?.basis).toMatch(/door widths/);
-    expect(r.annotations.calibration?.estimatedPixelsPerMeter?.basis).toMatch(/door widths/);
+    expect(r.calibration?.basis).toMatch(/door width/);
+    expect(r.annotations.calibration?.estimatedPixelsPerMeter?.basis).toMatch(/door width/);
     expect(r.review?.status).toBe('needs-review');
     expect(r.review?.problems.some((p) => p.code === 'scale-estimated')).toBe(true);
     // Still a usable estimate (doors are drawn 0.7–0.9 m wide), never presented as measured.
@@ -111,7 +119,14 @@ describe('confidence and failure', () => {
   it('fails (and builds nothing) on an image with no plan in it', async () => {
     const r = await extractFromImage(blankImage(400, 300), source('blank'), {});
     expect(r.review?.status).toBe('failed');
-    expect(r.review?.problems.some((p) => p.code === 'no-rooms')).toBe(true);
+    // Stopped at the document check: one reason, nothing guessed.
+    expect(r.review?.problems.map((p) => p.code)).toEqual(['not-a-floor-plan']);
+    expect(r.review?.components.walls.status).toBe('failed');
+    // On request it runs anyway — and still builds nothing, because there is no geometry.
+    const forced = await extractFromImage(blankImage(400, 300), source('blank'), { force: true });
+    expect(forced.stages.map((s) => s.stage)).toContain('rooms');
+    expect(forced.review?.status).toBe('failed');
+    expect(forced.review?.problems.map((p) => p.code)).toContain('no-rooms');
   });
 
   it('fails on a drawing that is not a closed plan (a few loose strokes)', async () => {

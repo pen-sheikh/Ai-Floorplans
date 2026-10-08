@@ -1,15 +1,52 @@
 import { useMemo, useState } from 'react';
-import { acceptExtraction, closeExtraction, rerunWithReference } from '../app/extractionActions';
-import type { ExtractionResult, FloorPlanAnnotations, PxPoint, ReviewProblem } from '../floorplan';
+import { acceptExtraction, closeExtraction, rerunAnyway, rerunWithReference } from '../app/extractionActions';
+import type {
+  ComponentAssessment,
+  ExtractionComponent,
+  ExtractionResult,
+  ExtractionReview,
+  FloorPlanAnnotations,
+  IssueImpact,
+  PxPoint,
+  ReviewProblem,
+} from '../floorplan';
 import { pxWallGeometry, spanAlongWall } from '../floorplan/wallGeometry';
 import { useExtraction } from '../state/extractionStore';
 import { IconX } from './icons';
 
 const pct = (x: number | undefined) => (x === undefined ? '—' : `${Math.round(x * 100)} %`);
-const STATUS: Record<'ok' | 'needs-review' | 'failed', { badge: string; label: string }> = {
+const STATUS: Record<ExtractionReview['status'], { badge: string; label: string }> = {
   ok: { badge: 'badge--green', label: 'Ready' },
-  'needs-review': { badge: 'badge--amber', label: 'Needs review' },
-  failed: { badge: 'badge--red', label: 'Extraction requires review' },
+  'ok-with-warnings': { badge: 'badge--green', label: 'Geometry OK · some details uncertain' },
+  'needs-review': { badge: 'badge--amber', label: 'Geometry needs review' },
+  failed: { badge: 'badge--red', label: 'No usable geometry' },
+};
+const COMPONENTS: [ExtractionComponent, string][] = [
+  ['walls', 'Walls'],
+  ['rooms', 'Rooms'],
+  ['roomLabels', 'Room labels'],
+  ['doors', 'Doors'],
+  ['windows', 'Windows'],
+  ['scale', 'Scale'],
+];
+const COMPONENT_BADGE: Record<ComponentAssessment['status'], string> = {
+  good: 'badge--green',
+  uncertain: 'badge--amber',
+  missing: '',
+  failed: 'badge--red',
+};
+/** Problems grouped by what they mean for using the result, most serious first. */
+const IMPACTS: [IssueImpact, string][] = [
+  ['geometry-failure', 'Blocks the 3D model'],
+  ['geometry-uncertain', 'Check the geometry'],
+  ['semantic-uncertainty', 'Names and room types'],
+  ['missing-optional', 'Not found (optional)'],
+];
+/** Long lists (a failed drawing can raise hundreds) are cut: the first items show the pattern. */
+const GROUP_LIMIT = 25;
+const ACCEPT_NOTE: Partial<Record<ExtractionReview['status'], string>> = {
+  'ok-with-warnings':
+    'The geometry is usable. Uncertain names, types and openings are kept as flagged and can be corrected later.',
 };
 
 /** Upload review: what was found, how sure the extractor is, and what a person must check. */
@@ -78,77 +115,72 @@ function Review({ result, imageUrl }: { result: ExtractionResult; imageUrl: stri
           <span className={`badge ${STATUS[status].badge}`}>{STATUS[status].label}</span>
           <span className="muted small">overall confidence {pct(c?.overall)}</span>
         </div>
-        <dl className="kv kv--small">
-          <Count
-            label="Walls"
-            n={ann.walls.length}
-            conf={c?.walls}
-            extra={
-              ann.walls.some((w) => w.kind === 'railing')
-                ? `${ann.walls.filter((w) => w.kind === 'railing').length} railing`
-                : undefined
-            }
-          />
-          <Count
-            label="Rooms"
-            n={ann.rooms.length}
-            conf={c?.rooms}
-            extra={`${ann.rooms.filter((r) => r.labelSource === 'plan-label').length} named`}
-          />
-          <Count
-            label="Doors"
-            n={ann.doors.filter((d) => d.kind !== 'opening').length}
-            conf={c?.doors}
-            extra={
-              ann.doors.some((d) => d.kind === 'opening')
-                ? `+${ann.doors.filter((d) => d.kind === 'opening').length} uncertain`
-                : undefined
-            }
-          />
-          <Count label="Windows" n={ann.windows.length} conf={c?.windows} />
-          <div className="kv__row">
-            <dt>Scale</dt>
-            <dd>
-              {cal ? (
-                <>
-                  {cal.pixelsPerMeter.toFixed(1)} px/m ·{' '}
-                  {cal.strategy === 'estimated' ? (
-                    <strong>ESTIMATED</strong>
-                  ) : cal.strategy === 'dimension-labels' ? (
-                    'printed dimensions'
-                  ) : (
-                    cal.strategy
-                  )}{' '}
-                  ({cal.confidence})
-                </>
-              ) : (
-                '—'
-              )}
-            </dd>
-          </div>
-        </dl>
+        {result.review?.document && result.review.document.verdict !== 'LIKELY_FLOOR_PLAN' && (
+          <DocumentNotice doc={result.review.document} empty={!ann.walls.length} />
+        )}
+        {result.review?.components && (
+          <dl className="kv kv--small extraction__components">
+            {COMPONENTS.map(([key, label]) => {
+              const a = result.review!.components[key];
+              return (
+                <div className="kv__row" key={key}>
+                  <dt>{label}</dt>
+                  <dd>
+                    <span className={`badge ${COMPONENT_BADGE[a.status]}`}>{a.status}</span>{' '}
+                    {key === 'scale' && cal?.strategy === 'estimated' ? (
+                      <>
+                        {cal.pixelsPerMeter.toFixed(1)} px/m · <strong>ESTIMATED</strong>
+                      </>
+                    ) : (
+                      a.summary
+                    )}
+                    {a.status !== 'missing' && <span className="muted"> · {pct(a.confidence)}</span>}
+                  </dd>
+                </div>
+              );
+            })}
+          </dl>
+        )}
         <ScaleCorrection ann={ann} />
         <section className="field">
-          <span>Review ({problems.length})</span>
-          <ul className="extraction__problems">
-            {problems.map((p, i) => (
-              <ProblemItem
-                key={`${p.code}-${i}`}
-                p={p}
-                active={!!highlight.length && ids(p).every((id) => highlight.includes(id))}
-                onSelect={() => set({ highlight: ids(p) })}
-              />
-            ))}
-            {!problems.length && <li className="muted small">Nothing to review.</li>}
-          </ul>
+          <span>Review ({problems.filter((p) => p.severity !== 'info').length} to check)</span>
+          <div className="extraction__problems">
+            {IMPACTS.map(([impact, title]) => {
+              const group = problems.filter((p) => p.impact === impact);
+              if (!group.length) return null;
+              return (
+                <div key={impact} className="extraction__group">
+                  <h3 className="extraction__group-title">
+                    {title} <span className="muted">({group.length})</span>
+                  </h3>
+                  <ul>
+                    {group.slice(0, GROUP_LIMIT).map((p, i) => (
+                      <ProblemItem
+                        key={`${p.code}-${i}`}
+                        p={p}
+                        active={!!highlight.length && ids(p).every((id) => highlight.includes(id))}
+                        onSelect={() => set({ highlight: ids(p) })}
+                      />
+                    ))}
+                    {group.length > GROUP_LIMIT && (
+                      <li className="muted small">and {group.length - GROUP_LIMIT} more of these</li>
+                    )}
+                  </ul>
+                </div>
+              );
+            })}
+            {!problems.length && <p className="muted small">Nothing to review.</p>}
+          </div>
         </section>
         {status === 'failed' ? (
           <div className="note note--error">
-            <strong>Extraction requires review.</strong> No 3D model is built from this result. Check the
-            errors above; a clearer scan (or a plan with closed walls) is needed.
+            <strong>No 3D model can be built from this result.</strong> The problems under &ldquo;Blocks the
+            3D model&rdquo; must be resolved first &mdash; usually a clearer image, or a plan with closed,
+            solid walls.
           </div>
         ) : (
           <>
+            {ACCEPT_NOTE[status] && <p className="muted small">{ACCEPT_NOTE[status]}</p>}
             {status === 'needs-review' && (
               <label className="check small">
                 <input
@@ -156,7 +188,7 @@ function Review({ result, imageUrl }: { result: ExtractionResult; imageUrl: stri
                   checked={acknowledged}
                   onChange={(e) => set({ acknowledged: e.target.checked })}
                 />{' '}
-                I have reviewed the items above; build the model with them flagged.
+                I have checked the geometry items above; build the model with them flagged.
               </label>
             )}
             <button
@@ -178,14 +210,25 @@ function Review({ result, imageUrl }: { result: ExtractionResult; imageUrl: stri
 
 const ids = (p: ReviewProblem) => p.elementIds ?? (p.elementId ? [p.elementId] : []);
 
-function Count({ label, n, conf, extra }: { label: string; n: number; conf?: number; extra?: string }) {
+/** "Is this probably a floor plan?" — shown when the answer is not a confident yes. */
+function DocumentNotice({ doc, empty }: { doc: NonNullable<ExtractionReview['document']>; empty: boolean }) {
+  const unlikely = doc.verdict === 'UNLIKELY_FLOOR_PLAN';
   return (
-    <div className="kv__row">
-      <dt>{label}</dt>
-      <dd>
-        {n}
-        {extra ? ` (${extra})` : ''} · {pct(conf)}
-      </dd>
+    <div className={`note ${unlikely ? 'note--error' : 'note--warning'} small`} role="status">
+      <strong>
+        {unlikely ? 'This image does not look like a floor plan' : 'This image may not be a floor plan'}
+      </strong>{' '}
+      ({pct(doc.confidence)} likely to be one).
+      <ul>
+        {doc.evidence.slice(0, 4).map((e) => (
+          <li key={e}>{e}</li>
+        ))}
+      </ul>
+      {unlikely && empty && (
+        <button className="btn btn--sm" onClick={() => void rerunAnyway()}>
+          It is a floor plan &mdash; try anyway
+        </button>
+      )}
     </div>
   );
 }
@@ -203,6 +246,7 @@ function ProblemItem({ p, active, onSelect }: { p: ReviewProblem; active: boolea
         onClick={onSelect}
         title={canLocate ? 'Show on the plan' : undefined}
       >
+        <span className="extraction__category">{p.category.replace(/_/g, ' ')}</span>
         {p.message}
       </button>
     </li>
@@ -346,6 +390,19 @@ function PlanOverlay({
           />
         );
       })}
+      {(ann.inferredBoundaries ?? []).map((b) => (
+        <line
+          key={b.id}
+          x1={b.a.x}
+          y1={b.a.y}
+          x2={b.b.x}
+          y2={b.b.y}
+          strokeWidth={stroke * 1.5}
+          className={`ov-inferred${hl.has(b.id) ? ' ov--hl' : ''}`}
+        >
+          <title>{`Inferred boundary: ${b.reason}`}</title>
+        </line>
+      ))}
       {openings.map((o) =>
         o.s ? (
           <line

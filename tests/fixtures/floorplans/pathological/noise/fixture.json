@@ -1,0 +1,20 @@
+{
+  "id": "noise",
+  "category": "pathological",
+  "annotation": "qualitative",
+  "description": "Random grey noise: not a floor plan.",
+  "image": {
+    "generate": {
+      "kind": "noise",
+      "width": 600,
+      "height": 450,
+      "seed": 3
+    }
+  },
+  "expect": {
+    "status": ["failed"],
+    "documentVerdict": "UNLIKELY_FLOOR_PLAN",
+    "failureCategory": "image_quality",
+    "maxSeconds": 20
+  }
+}

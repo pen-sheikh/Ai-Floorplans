@@ -74,41 +74,156 @@ export function groupLines(words: OcrWord[]): TextLine[] {
 
 // ── Room names ──────────────────────────────────────────────────────────────────────
 
-const LEXICON: [string, RoomType][] = [
-  ['BEDROOM', 'bedroom'],
-  ['BED', 'bedroom'],
-  ['MASTER', 'bedroom'],
-  ['LIVING', 'living'],
-  ['LOUNGE', 'living'],
-  ['RECEPTION', 'living'],
-  ['SITTING', 'living'],
-  ['FAMILY', 'living'],
-  ['KITCHEN', 'kitchen'],
-  ['DINING', 'dining'],
-  ['DINER', 'dining'],
-  ['BATHROOM', 'bathroom'],
-  ['BATH', 'bathroom'],
-  ['SHOWER', 'bathroom'],
-  ['ENSUITE', 'bathroom'],
-  ['EN-SUITE', 'bathroom'],
-  ['WC', 'toilet'],
-  ['W.C.', 'toilet'],
-  ['TOILET', 'toilet'],
-  ['CLOAKROOM', 'toilet'],
-  ['HALL', 'hall'],
-  ['HALLWAY', 'hall'],
-  ['ENTRANCE', 'hall'],
-  ['LANDING', 'hall'],
-  ['CORRIDOR', 'hall'],
-  ['BALCONY', 'balcony'],
-  ['TERRACE', 'balcony'],
-  ['UTILITY', 'utility'],
-  ['STUDY', 'living'],
-  ['OFFICE', 'living'],
-  ['STORE', 'storage'],
-  ['STORAGE', 'storage'],
-  ['CUPBOARD', 'storage'],
-  ['WARDROBE', 'storage'],
+interface LexEntry {
+  /** Upper-case ASCII spelling (accents are stripped from OCR text before matching). */
+  word: string;
+  /** 'unknown': a real room name that does not determine one of the model's room types. */
+  type: RoomType;
+  /** Display word for abbreviations ("BR" → "Bedroom"); otherwise the word itself. */
+  display?: string;
+  /** How strongly the word implies the type (ambiguous words such as "Zimmer" are weak). */
+  weight?: number;
+}
+
+/**
+ * Room-name vocabulary: English, common abbreviations, and frequent French, German, Spanish,
+ * Italian and Dutch words. General vocabulary only — never names copied from a specific plan.
+ */
+const LEXICON: LexEntry[] = [
+  // Bedrooms
+  { word: 'BEDROOM', type: 'bedroom' },
+  { word: 'BED', type: 'bedroom', display: 'Bedroom' },
+  { word: 'BEDRM', type: 'bedroom', display: 'Bedroom' },
+  { word: 'BDRM', type: 'bedroom', display: 'Bedroom' },
+  { word: 'BR', type: 'bedroom', display: 'Bedroom', weight: 0.7 },
+  { word: 'MASTER', type: 'bedroom', display: 'Master Bedroom' },
+  { word: 'SLEEPOUT', type: 'bedroom', weight: 0.7 },
+  { word: 'NURSERY', type: 'bedroom' },
+  { word: 'CHAMBRE', type: 'bedroom' },
+  { word: 'SCHLAFZIMMER', type: 'bedroom' },
+  { word: 'KINDERZIMMER', type: 'bedroom' },
+  { word: 'ZIMMER', type: 'bedroom', weight: 0.45 },
+  { word: 'DORMITORIO', type: 'bedroom' },
+  { word: 'HABITACION', type: 'bedroom', weight: 0.7 },
+  { word: 'SLAAPKAMER', type: 'bedroom' },
+  // Living
+  { word: 'LIVING', type: 'living' },
+  { word: 'LOUNGE', type: 'living' },
+  { word: 'RECEPTION', type: 'living' },
+  { word: 'SITTING', type: 'living' },
+  { word: 'FAMILY', type: 'living', weight: 0.8 },
+  { word: 'SALON', type: 'living' },
+  { word: 'SEJOUR', type: 'living' },
+  { word: 'WOHNZIMMER', type: 'living' },
+  { word: 'WOHNEN', type: 'living' },
+  { word: 'SALA', type: 'living', weight: 0.8 },
+  { word: 'ESTAR', type: 'living' },
+  { word: 'SOGGIORNO', type: 'living' },
+  { word: 'WOONKAMER', type: 'living' },
+  // Kitchen
+  { word: 'KITCHEN', type: 'kitchen' },
+  { word: 'KITCHENETTE', type: 'kitchen' },
+  { word: 'KIT', type: 'kitchen', display: 'Kitchen', weight: 0.8 },
+  { word: 'KITCH', type: 'kitchen', display: 'Kitchen' },
+  { word: 'CUISINE', type: 'kitchen' },
+  { word: 'KUCHE', type: 'kitchen', display: 'Küche' },
+  { word: 'KUECHE', type: 'kitchen', display: 'Küche' },
+  { word: 'COCINA', type: 'kitchen' },
+  { word: 'CUCINA', type: 'kitchen' },
+  { word: 'KEUKEN', type: 'kitchen' },
+  // Dining
+  { word: 'DINING', type: 'dining' },
+  { word: 'DINER', type: 'dining' },
+  { word: 'ESSZIMMER', type: 'dining' },
+  { word: 'ESSEN', type: 'dining', weight: 0.8 },
+  { word: 'COMEDOR', type: 'dining' },
+  // Bathrooms and toilets
+  { word: 'BATHROOM', type: 'bathroom' },
+  { word: 'BATH', type: 'bathroom', display: 'Bathroom' },
+  { word: 'SHOWER', type: 'bathroom' },
+  { word: 'ENSUITE', type: 'bathroom' },
+  { word: 'EN-SUITE', type: 'bathroom' },
+  { word: 'T&B', type: 'bathroom', display: 'Bathroom' },
+  { word: 'WASHROOM', type: 'bathroom', weight: 0.8 },
+  { word: 'BAD', type: 'bathroom', display: 'Bad', weight: 0.8 },
+  { word: 'BADEZIMMER', type: 'bathroom' },
+  { word: 'SDB', type: 'bathroom', display: 'Salle de bains' },
+  { word: 'BANO', type: 'bathroom', display: 'Baño' },
+  { word: 'BAGNO', type: 'bathroom' },
+  { word: 'BADKAMER', type: 'bathroom' },
+  { word: 'WC', type: 'toilet', display: 'WC' },
+  { word: 'W.C.', type: 'toilet', display: 'WC' },
+  { word: 'TOILET', type: 'toilet' },
+  { word: 'TOILETS', type: 'toilet', display: 'Toilet' },
+  { word: 'TOILETTES', type: 'toilet' },
+  { word: 'LAVATORY', type: 'toilet' },
+  { word: 'CLOAKROOM', type: 'toilet' },
+  { word: 'CLOAKS', type: 'toilet', display: 'Cloakroom' },
+  { word: 'POWDER', type: 'toilet', display: 'Powder Room' },
+  // Circulation
+  { word: 'HALL', type: 'hall' },
+  { word: 'HALLWAY', type: 'hall' },
+  { word: 'ENTRANCE', type: 'hall' },
+  { word: 'ENTRY', type: 'hall' },
+  { word: 'LANDING', type: 'hall' },
+  { word: 'CORRIDOR', type: 'hall' },
+  { word: 'LOBBY', type: 'hall' },
+  { word: 'FOYER', type: 'hall' },
+  { word: 'PASSAGE', type: 'hall' },
+  { word: 'VESTIBULE', type: 'hall' },
+  { word: 'FLUR', type: 'hall' },
+  { word: 'DIELE', type: 'hall' },
+  { word: 'ENTREE', type: 'hall', display: 'Entrée' },
+  { word: 'PASILLO', type: 'hall' },
+  { word: 'RECIBIDOR', type: 'hall' },
+  { word: 'INGRESSO', type: 'hall' },
+  { word: 'GANG', type: 'hall', weight: 0.7 },
+  // Outdoor
+  { word: 'BALCONY', type: 'balcony' },
+  { word: 'TERRACE', type: 'balcony' },
+  { word: 'LOGGIA', type: 'balcony' },
+  { word: 'BALKON', type: 'balcony' },
+  { word: 'TERRASSE', type: 'balcony' },
+  { word: 'BALCON', type: 'balcony' },
+  { word: 'TERRAZA', type: 'balcony' },
+  { word: 'VERANDA', type: 'balcony' },
+  // Utility and storage
+  { word: 'UTILITY', type: 'utility' },
+  { word: 'LAUNDRY', type: 'utility' },
+  { word: 'WD', type: 'utility', display: 'Laundry', weight: 0.8 },
+  { word: 'BOILER', type: 'utility' },
+  { word: 'BUANDERIE', type: 'utility' },
+  { word: 'HAUSWIRTSCHAFT', type: 'utility' },
+  { word: 'LAVANDERIA', type: 'utility' },
+  { word: 'STORE', type: 'storage' },
+  { word: 'STORAGE', type: 'storage' },
+  { word: 'CUPBOARD', type: 'storage' },
+  { word: 'CPD', type: 'storage', display: 'Cupboard' },
+  { word: 'CLOSET', type: 'storage' },
+  { word: 'CLOS', type: 'storage', display: 'Closet' },
+  { word: 'WARDROBE', type: 'storage' },
+  { word: 'WIC', type: 'storage', display: 'Walk-in Closet' },
+  { word: 'PANTRY', type: 'storage' },
+  { word: 'LINEN', type: 'storage' },
+  { word: 'AIRING', type: 'storage' },
+  { word: 'KAMMER', type: 'storage', weight: 0.7 },
+  { word: 'ABSTELLRAUM', type: 'storage' },
+  { word: 'RANGEMENT', type: 'storage' },
+  { word: 'PLACARD', type: 'storage' },
+  { word: 'TRASTERO', type: 'storage' },
+  // Real rooms whose type the model does not represent: the name is kept, the type stays unknown.
+  { word: 'STUDY', type: 'unknown' },
+  { word: 'OFFICE', type: 'unknown' },
+  { word: 'DEN', type: 'unknown' },
+  { word: 'LIBRARY', type: 'unknown' },
+  { word: 'GARAGE', type: 'unknown' },
+  { word: 'CARPORT', type: 'unknown' },
+  { word: 'PORCH', type: 'unknown' },
+  { word: 'STAIRS', type: 'unknown' },
+  { word: 'STAIRCASE', type: 'unknown' },
+  { word: 'TREPPENHAUS', type: 'unknown' },
+  { word: 'ARBEITSZIMMER', type: 'unknown' },
+  { word: 'BUREAU', type: 'unknown' },
 ];
 
 /** OCR digit/letter confusions, used ONLY to compare against the lexicon (text is not rewritten). */
@@ -141,9 +256,14 @@ export interface RoomNameMatch {
   raw: string;
   /** Lexicon words recognised (e.g. KITCHEN, LOUNGE, DINER). */
   words: string[];
+  /** A clean name built from the recognised words and room numbers ("Bedroom 2"). */
+  display: string;
+  /** 'unknown' when the label names a room the model has no type for (e.g. "Study"). */
   type: RoomType;
   /** OCR confidence reduced for every correction needed to match. */
   confidence: number;
+  /** How strongly the words imply the type (1 = unambiguous). */
+  typeWeight: number;
   corrections: number;
 }
 
@@ -152,15 +272,13 @@ const COMBINED_TYPES: Partial<Record<string, RoomType>> = {
   'kitchen+dining': 'kitchen-living',
   'kitchen+living+dining': 'kitchen-living',
   'dining+living': 'living',
+  'bathroom+toilet': 'bathroom',
 };
 
-/**
- * Recognise a room name. "BED ROOM", "BEDR00M" and "Kitchen/Lounge/Diner" match; anything
- * that would need more than one correction per 5 letters is rejected rather than guessed.
- */
 /** Words that often accompany a room name without changing what the room is. */
 const NEUTRAL_WORDS = new Set([
   'ROOM',
+  'RM',
   'AREA',
   'MAIN',
   'PRINCIPAL',
@@ -176,48 +294,123 @@ const NEUTRAL_WORDS = new Set([
   'NO',
   'THE',
   'AND',
+  'DE',
+  'DU',
+  'LA',
+  'LE',
+  'SALLE',
+  'MAIDS',
+  'MAID',
 ]);
 
+const stripAccents = (s: string) => s.normalize('NFD').replace(/[̀-ͯ]/g, '');
+const titleWord = (w: string) => w[0]!.toUpperCase() + w.slice(1).toLowerCase();
+
+/**
+ * Recognise a room name. "BED ROOM", "BEDR00M", "Kitchen/Lounge/Diner", "Chambre", "Küche"
+ * match; anything that would need more than one correction per 5 letters is rejected rather
+ * than guessed, and so is text that merely mentions a room.
+ */
 export function matchRoomName(raw: string, ocrConfidence = 1): RoomNameMatch | null {
   // Parenthesised text is a note ("(excluding Balcony)"), not a label.
   if (/[()]/.test(raw)) return null;
-  const cleaned = raw.toUpperCase().replace(/[^A-Z0-9/&.\-| ]/g, ' ');
+  const cleaned = stripAccents(raw)
+    .toUpperCase()
+    .replace(/[’']/g, '')
+    .replace(/[^A-Z0-9/&.\-| ]/g, ' ');
   // Re-join words split by OCR ("BED ROOM") before splitting on separators.
-  const joined = cleaned.replace(/\bBED\s+ROOM\b/g, 'BEDROOM').replace(/\bBATH\s+ROOM\b/g, 'BATHROOM');
-  const parts = joined.split(/[\s/&+,]+|\bAND\b/).filter((p) => p.length >= 2 && !/^\d+$/.test(p));
+  const joined = cleaned
+    .replace(/\bBED\s+ROOM\b/g, 'BEDROOM')
+    .replace(/\bBATH\s+ROOM\b/g, 'BATHROOM')
+    .replace(/\bT\s*&\s*B\b/g, 'T&B')
+    .replace(/\bW\s*\/\s*C\b/g, 'WC')
+    .replace(/\bW\s*\/\s*D\b/g, 'WD');
+  const tokens = joined
+    .split(/(?:[\s,+]|\bAND\b)+|(?<=[A-Z.])\/(?=[A-Z])|(?<=[A-Z])\/(?=\s)/)
+    .filter(Boolean);
   const words: string[] = [];
   const types: RoomType[] = [];
+  const display: string[] = [];
+  const weights: number[] = [];
   let corrections = 0;
   let unmatched = 0;
-  for (const part of parts) {
+  for (const token of tokens) {
+    const part = token.replace(/^[.\-|]+|[.\-|]+$/g, '') || token;
+    if (/^\d{1,2}$/.test(part)) {
+      if (display.length) display.push(part); // room number ("Bedroom 2")
+      continue;
+    }
+    if (part.length < 2 && !/^\d$/.test(part)) continue;
     const candidate = part.replace(/[0-9|]/g, (c) => ALPHA_CONFUSIONS[c] ?? c);
-    let best: { word: string; type: RoomType; d: number } | null = null;
-    for (const [word, type] of LEXICON) {
-      const d = levenshtein(candidate, word);
-      const allowed = word.length <= 3 ? 0 : word.length <= 5 ? 1 : 2;
-      if (d <= allowed && (!best || d < best.d)) best = { word, type, d };
+    let best: { e: LexEntry; d: number } | null = null;
+    for (const e of LEXICON) {
+      const d = levenshtein(candidate, e.word);
+      const allowed = e.word.length <= 3 ? 0 : e.word.length <= 5 ? 1 : 2;
+      if (d <= allowed && (!best || d < best.d)) best = { e, d };
     }
     if (!best) {
       if (/^[A-Z]{3,}$/.test(part) && !NEUTRAL_WORDS.has(part)) unmatched++;
       continue;
     }
-    words.push(best.word);
-    types.push(best.type);
+    words.push(best.e.word);
+    types.push(best.e.type);
+    weights.push(best.e.weight ?? 1);
+    const shown = best.e.display ?? titleWord(best.e.word);
+    if (!display.includes(shown) && !(shown === 'Bedroom' && display.includes('Master Bedroom'))) {
+      if (shown === 'Master Bedroom' && display.includes('Bedroom'))
+        display.splice(display.indexOf('Bedroom'), 1, shown);
+      else display.push(shown);
+    }
     corrections += best.d + (candidate !== part ? 1 : 0);
   }
   // A sentence that merely mentions a room ("Ceiling height reduced in kitchen") is not a label.
   if (!words.length || unmatched > words.length) return null;
-  const set = [...new Set(types)].sort();
-  const type =
-    set.length === 1
-      ? set[0]!
-      : (COMBINED_TYPES[set.join('+')] ?? (set.includes('kitchen') ? 'kitchen-living' : set[0]!));
+  const known = [...new Set(types.filter((t) => t !== 'unknown'))].sort();
+  const type: RoomType = !known.length
+    ? 'unknown'
+    : known.length === 1
+      ? known[0]!
+      : (COMBINED_TYPES[known.join('+')] ?? (known.includes('kitchen') ? 'kitchen-living' : 'unknown'));
+  const named = [...new Set(types)].length > 1 && known.length > 1;
   return {
     raw,
     words,
+    display: display.join(named ? ' / ' : ' ').replace(/ \/ (\d+)/g, ' $1'),
     type,
     corrections,
+    typeWeight: Math.min(...weights),
     confidence: +(ocrConfidence * Math.max(0.3, 1 - 0.12 * corrections)).toFixed(3),
+  };
+}
+
+/** Types that legitimately share one open-plan space. */
+const OPEN_PLAN = new Set<RoomType>(['kitchen', 'living', 'dining', 'kitchen-living']);
+
+/**
+ * Several room names inside one enclosed space. Open-plan combinations (kitchen / living /
+ * dining) are one room; anything else suggests two rooms whose dividing wall was not found —
+ * `plausible` says which.
+ */
+export function combineRoomNames(matches: RoomNameMatch[]): { match: RoomNameMatch; plausible: boolean } {
+  const distinct = matches.filter((m, i) => matches.findIndex((o) => o.display === m.display) === i);
+  if (distinct.length === 1) return { match: distinct[0]!, plausible: matches.length === 1 };
+  const types = [...new Set(distinct.map((m) => m.type).filter((t) => t !== 'unknown'))].sort();
+  const flat = types.flatMap((t) => (t === 'kitchen-living' ? ['kitchen', 'living'] : [t]));
+  const key = [...new Set(flat)].sort().join('+');
+  const plausible = types.every((t) => OPEN_PLAN.has(t));
+  const type: RoomType =
+    types.length === 1 ? types[0]! : plausible ? (COMBINED_TYPES[key] ?? 'kitchen-living') : 'unknown';
+  return {
+    plausible,
+    match: {
+      raw: distinct.map((m) => m.raw).join(' / '),
+      words: distinct.flatMap((m) => m.words),
+      display: distinct.map((m) => m.display).join(' / '),
+      type,
+      confidence: Math.min(...distinct.map((m) => m.confidence)),
+      typeWeight: Math.min(...distinct.map((m) => m.typeWeight)),
+      corrections: distinct.reduce((s, m) => s + m.corrections, 0),
+    },
   };
 }
 
@@ -226,19 +419,30 @@ export function matchRoomName(raw: string, ocrConfidence = 1): RoomNameMatch | n
 export interface ParsedDimension {
   /** Metres. */
   values: number[];
-  unit: 'm' | 'mm';
+  unit: 'm' | 'mm' | 'ft';
   raw: string;
 }
 
 const NUM = String.raw`(\d{1,2}[.,]\d{1,3})`;
+/** Feet and inches: 14'0", 12' 7", 10'-6", 9' (OCR often reads ’ or ” for the marks). */
+const FT = String.raw`(\d{1,3})\s*['’′]\s*-?\s*(?:(\d{1,2}(?:\.\d)?)\s*(?:["”″]|''))?`;
+const feet = (ft: string, inch?: string) => +(Number(ft) * 0.3048 + Number(inch ?? 0) * 0.0254).toFixed(4);
 
 /**
  * Parse printed dimensions: "3.84m x 2.66m", "6.39 x 3.77 m", "4200 x 3100 mm", "3.20",
- * "5.40 m". Imperial values are ignored. Returns null when the text is not a dimension.
+ * "5.40 m", and feet-and-inches "14'0" x 12'8"" (converted to metres, unit 'ft'). Metric is
+ * preferred where a label gives both. Returns null when the text is not a dimension.
  */
 export function parseDimension(text: string): ParsedDimension | null {
   const t = text.replace(/[×X]/g, 'x').replace(/\s+/g, ' ').trim();
-  if (/['"’”]/.test(t) && !/\d\s*m\b/.test(t)) return null; // imperial only
+  const imperialOnly = /['"’”′″]/.test(t) && !/\d\s*m\b/.test(t);
+  if (imperialOnly) {
+    const pair = t.match(new RegExp(`${FT}\\s*x\\s*${FT}`, 'i'));
+    if (pair) return { values: [feet(pair[1]!, pair[2]), feet(pair[3]!, pair[4])], unit: 'ft', raw: text };
+    const single = t.match(new RegExp(`^${FT}$`, 'i'));
+    if (single) return { values: [feet(single[1]!, single[2])], unit: 'ft', raw: text };
+    return null;
+  }
   const pair =
     t.match(new RegExp(`${NUM}\\s*m?\\s*x\\s*${NUM}\\s*m\\b`, 'i')) ??
     t.match(new RegExp(`^${NUM}\\s*m?\\s*x\\s*${NUM}\\s*m?$`, 'i'));

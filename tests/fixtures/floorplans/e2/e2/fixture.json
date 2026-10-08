@@ -1,0 +1,19 @@
+{
+  "id": "e2",
+  "category": "e2",
+  "annotation": "full",
+  "description": "Packenham House E2 (third floor), estate-agent style plan; hand-made ground truth.",
+  "image": {
+    "path": "floor-plans/E2-floorplan.jpg"
+  },
+  "groundTruth": "e2",
+  "expect": {
+    "status": ["ok", "ok-with-warnings", "needs-review"],
+    "minWallRecall": 0.9,
+    "minRoomDetection": 0.85,
+    "minDoorRecall": 0.8,
+    "minWindowRecall": 0.8,
+    "maxScaleError": 0.02,
+    "maxSeconds": 60
+  }
+}

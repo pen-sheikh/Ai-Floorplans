@@ -174,6 +174,7 @@ export function parseAnnotationsJson(raw: unknown): AnnotationParseResult {
       'fixtures',
       'labels',
       'drawingNotes',
+      'inferredBoundaries',
     ],
     'annotations',
   );
@@ -266,6 +267,7 @@ export function parseAnnotationsJson(raw: unknown): AnnotationParseResult {
         'kind',
         'hinge',
         'swing',
+        'swingConfidence',
         'label',
         'heightMeters',
         'heightFromPlan',
@@ -280,6 +282,7 @@ export function parseAnnotationsJson(raw: unknown): AnnotationParseResult {
     oneOf(d.kind, DOOR_KINDS, `${p}.kind`);
     oneOf(d.hinge, ['min', 'max'], `${p}.hinge`);
     oneOf(d.swing, ['up', 'down', 'left', 'right'], `${p}.swing`);
+    if (d.swingConfidence !== undefined) num(d.swingConfidence, `${p}.swingConfidence`, 0, 1);
     if (d.heightMeters !== undefined) num(d.heightMeters, `${p}.heightMeters`, 0.5, 5);
     confidence(d, p);
   });
@@ -320,6 +323,10 @@ export function parseAnnotationsJson(raw: unknown): AnnotationParseResult {
         'exterior',
         'confidence',
         'note',
+        'geometryConfidence',
+        'labelConfidence',
+        'classificationConfidence',
+        'classification',
       ],
       p,
     );
@@ -327,6 +334,15 @@ export function parseAnnotationsJson(raw: unknown): AnnotationParseResult {
     str(r.name, `${p}.name`);
     oneOf(r.type, ROOM_TYPES, `${p}.type`);
     oneOf(r.labelSource, ['plan-label', 'inferred', 'unknown'], `${p}.labelSource`);
+    for (const k of ['geometryConfidence', 'labelConfidence', 'classificationConfidence']) {
+      if (r[k] !== undefined) num(r[k], `${p}.${k}`, 0, 1);
+    }
+    if (r.classification !== undefined) {
+      if (!isObj(r.classification) || !Array.isArray(r.classification.evidence))
+        err(`${p}.classification`, 'expected {evidence[], suggestedType?}');
+      else if (r.classification.suggestedType !== undefined)
+        oneOf(r.classification.suggestedType, ROOM_TYPES, `${p}.classification.suggestedType`);
+    }
     points(r.polygon, `${p}.polygon`, 3);
     if (r.dimensions !== undefined) {
       if (!Array.isArray(r.dimensions)) err(`${p}.dimensions`, 'expected an array');
@@ -359,6 +375,17 @@ export function parseAnnotationsJson(raw: unknown): AnnotationParseResult {
     str(n.id, `${p}.id`);
     str(n.message, `${p}.message`);
   });
+  list(
+    a.inferredBoundaries,
+    'inferredBoundaries',
+    (b, p) => {
+      str(b.id, `${p}.id`);
+      point(b.a, `${p}.a`);
+      point(b.b, `${p}.b`);
+      str(b.reason, `${p}.reason`);
+    },
+    true,
+  );
 
   return errors.length
     ? { ok: false, errors }
