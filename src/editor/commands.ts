@@ -1,4 +1,5 @@
 import type { Apartment, Door, Floor, FurnitureItem, Room, RoomRenovation, Window } from '../domain/types';
+import { moveWall } from './wallMove';
 
 /**
  * Every edit is a plain, serialisable command applied by a pure function. This gives
@@ -21,6 +22,11 @@ export type Command =
       id: string;
       patch: Partial<Pick<Window, 'kind' | 'materialId' | 'sillHeight' | 'height'>>;
     }
+  /**
+   * Move an interior wall `distance` metres along its normal n = (−d.z, d.x), carrying the
+   * attached walls, room outlines and topology with it (see `wallMove.ts`). User-corrected.
+   */
+  | { type: 'wall/move'; id: string; distance: number }
   | { type: 'batch'; label: string; commands: Command[] };
 
 export type FurniturePatch = Partial<
@@ -80,10 +86,14 @@ export function applyCommand(apt: Apartment, cmd: Command): Apartment {
     }
     case 'room/renovate':
     case 'room/rename': {
+      if (cmd.type === 'room/rename' && !cmd.name.trim())
+        throw new CommandError('A room name cannot be empty');
       const target = floorWith(apt, (f) => f.rooms.some((r) => r.id === cmd.roomId), `Room ${cmd.roomId}`);
+      // A typed name is the user's: both the label source and the stored name provenance say so.
+      // Type, geometry and the extractor's confidences (an audit of what was read) are kept.
       const fn = (r: Room): Room =>
         cmd.type === 'room/rename'
-          ? { ...r, name: cmd.name, labelSource: 'user' }
+          ? { ...r, name: cmd.name, labelSource: 'user', sources: { ...r.sources, name: 'user' } }
           : { ...r, renovation: { ...r.renovation, ...cmd.patch } };
       return mapFloors(apt, (f) =>
         f === target ? { ...f, rooms: updateIn(f.rooms, cmd.roomId, fn, 'Room') } : f,
@@ -138,6 +148,12 @@ export function applyCommand(apt: Apartment, cmd: Command): Apartment {
           : f,
       );
     }
+    case 'wall/move': {
+      const target = floorWith(apt, (f) => f.walls.some((w) => w.id === cmd.id), `Wall ${cmd.id}`);
+      const moved = moveWall(target, cmd.id, cmd.distance);
+      if (!moved.ok) throw new CommandError(moved.reason);
+      return mapFloors(apt, (f) => (f === target ? moved.floor : f));
+    }
     case 'batch':
       return cmd.commands.reduce(applyCommand, apt);
   }
@@ -172,6 +188,8 @@ export function describeCommand(cmd: Command): string {
       return 'Change door';
     case 'window/update':
       return 'Change window';
+    case 'wall/move':
+      return 'Move wall';
     case 'batch':
       return cmd.label;
   }

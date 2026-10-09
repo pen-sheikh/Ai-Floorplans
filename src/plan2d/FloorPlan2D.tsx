@@ -139,6 +139,35 @@ export function FloorPlan2D() {
             </polygon>
           );
         })}
+        {floor.walls.map((w) => {
+          // Walls are selectable here too (same selection as 3D). A wall whose position the user
+          // corrected is drawn, since the plan image underneath still shows where it was.
+          const sel = selection?.kind === 'wall' && selection.id === w.id;
+          return (
+            <polygon
+              key={w.id}
+              data-wall={w.id}
+              className={`plan-wall${w.sources.geometry === 'user' ? ' plan-wall--user' : ''}${sel ? ' plan-wall--selected' : ''}`}
+              points={toPoints(wallFootprint(w), t)}
+              tabIndex={0}
+              role="button"
+              aria-pressed={sel}
+              aria-label={`Wall ${w.id} (${w.kind})`}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter' || e.key === ' ') {
+                  e.preventDefault();
+                  select({ kind: 'wall', id: w.id });
+                }
+              }}
+              onClick={(e) => {
+                e.stopPropagation();
+                select({ kind: 'wall', id: w.id });
+              }}
+            >
+              <title>{`Wall (${w.kind}${w.sources.geometry === 'user' ? ', corrected' : ''})`}</title>
+            </polygon>
+          );
+        })}
         {floor.furniture.map((f) => {
           const sel = selection?.kind === 'furniture' && selection.id === f.id;
           return (

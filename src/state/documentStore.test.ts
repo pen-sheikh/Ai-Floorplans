@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { FurnitureItem } from '../domain/types';
-import { e2 } from '../test/fixtures';
+import { automaticSynthetic, e2 } from '../test/fixtures';
 import { createDocumentStore } from './documentStore';
 
 const item: FurnitureItem = {
@@ -110,5 +110,61 @@ describe('document store baseline (Cancel)', () => {
       sillHeight: 'user',
       height: 'assumed',
     });
+  });
+});
+
+describe('document store: room rename provenance', () => {
+  it('is undone and redone as one step, name provenance included', () => {
+    const store = createDocumentStore(automaticSynthetic());
+    const id = store.getState().apartment.floors[0]!.rooms[0]!.id;
+    const room = () => store.getState().apartment.floors[0]!.rooms.find((r) => r.id === id)!;
+    expect(store.getState().dispatch({ type: 'room/rename', roomId: id, name: 'Study' }).ok).toBe(true);
+    expect(room()).toMatchObject({ name: 'Study', labelSource: 'user', sources: { name: 'user' } });
+    store.getState().undo();
+    expect(room()).toMatchObject({ labelSource: 'ocr', sources: { name: 'ocr' } });
+    store.getState().redo();
+    expect(room()).toMatchObject({ name: 'Study', sources: { name: 'user' } });
+  });
+
+  it('reports an empty name as an error and keeps history untouched', () => {
+    const store = createDocumentStore(e2());
+    expect(store.getState().dispatch({ type: 'room/rename', roomId: 'hall', name: ' ' }).ok).toBe(false);
+    expect(store.getState().past).toHaveLength(0);
+  });
+});
+
+describe('document store: wall moves', () => {
+  it('applies a wall move as one undoable step, with exact undo and redo', () => {
+    const store = createDocumentStore(e2());
+    const before = store.getState().apartment;
+    const res = store.getState().dispatch({ type: 'wall/move', id: 'w-int-bed1-bed2', distance: 0.1 });
+    expect(res.ok).toBe(true);
+    const moved = store.getState().apartment;
+    expect(store.getState().past.map((p) => p.label)).toEqual(['Move wall']);
+    expect(moved.floors[0]!.walls.find((w) => w.id === 'w-int-bed1-bed2')!.sources.geometry).toBe('user');
+    store.getState().undo();
+    expect(store.getState().apartment).toBe(before);
+    store.getState().redo();
+    expect(store.getState().apartment).toBe(moved);
+  });
+
+  it('refuses a move the geometry cannot follow, or one that adds validation errors, keeping history', () => {
+    const store = createDocumentStore(e2());
+    const exterior = store.getState().dispatch({ type: 'wall/move', id: 'w-ext-north', distance: 0.1 });
+    expect(exterior).toMatchObject({ ok: false, error: expect.stringMatching(/exterior/) });
+    const invalid = store.getState().dispatch({ type: 'wall/move', id: 'w-int-bath-north', distance: -0.1 });
+    expect(invalid.ok).toBe(false);
+    expect(store.getState().past).toHaveLength(0);
+    expect(store.getState().validation.ok).toBe(true);
+  });
+
+  it('re-validates after a move (warnings such as a fixture now outside its room are kept visible)', () => {
+    const store = createDocumentStore(e2());
+    const warnings = () => store.getState().validation.issues.filter((i) => i.severity === 'warning').length;
+    const before = warnings();
+    expect(store.getState().dispatch({ type: 'wall/move', id: 'w-int-bath-north', distance: 0.1 }).ok).toBe(
+      true,
+    );
+    expect(warnings()).toBeGreaterThan(before);
   });
 });

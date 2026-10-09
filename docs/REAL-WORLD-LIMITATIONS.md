@@ -168,22 +168,24 @@ Summary of where the extractor stands:
     wide" reruns the extraction.
   - The user cannot move, add or delete walls; split or merge rooms; confirm an inferred
     boundary; or add or move doors and windows.
-  - After accepting, the model supports only:
+  - After accepting, the model supports:
     - furniture edits;
     - renovation;
     - room rename;
     - door kind, material, width and height;
-    - window kind, material, sill height and height.
+    - window kind, material, sill height and height;
+    - **one structural correction (Phase 5, slice 1):** moving an interior wall sideways
+      (`wall/move`).
 
-    There are no structural commands (see [DOMAIN-MODEL.md](DOMAIN-MODEL.md#editing-commands)).
-- **Future improvement:** Phase 5 (human-in-the-loop correction); see [ROADMAP.md](ROADMAP.md).
+    Exterior walls, wall endpoints, adding or deleting walls and openings, and splitting or
+    merging rooms are not editable (see [DOMAIN-MODEL.md](DOMAIN-MODEL.md#editing-commands)).
+- **Future improvement:** further Phase 5 slices; see [ROADMAP.md](ROADMAP.md).
 
 ### Room type cannot be changed by the user
 
 - **Current limitation:**
   - There is no command to set `Room.type`. An "Unknown Room" can be renamed (`room/rename` →
-    `labelSource: 'user'`), but its type stays `unknown`.
-  - Rename also does not update `sources.name`.
+    `labelSource` and `sources.name` become `user`), but its type stays `unknown`.
 - **Future improvement:** a `room/retype` command with `user` provenance (Phase 5).
 
 ### Uploaded images are not persisted
@@ -201,8 +203,8 @@ Summary of where the extractor stands:
 | Storeys | `Apartment.floors[]` supports multiple storeys, but the UI, assistant and intents use `floors[0]`. | Depends on stair support and a floor switcher. |
 | Furniture models | 20 parametric catalog items. glTF is supported by the renderer and catalog, but none are bundled. | Phase 7. |
 | AI provider | The assistant uses the offline rule-based parser. The LLM JSON contract and `JsonIntentProvider` exist and are tested, but no LLM is wired in. `setIntentProvider` is never called, and there are no keys. | Phase 9, with transport server-side. |
-| Renovation consistency | `renovateRoom` (`app/actions.ts`) also updates door and window materials. Applying a style preset (`planPreset`) only patches `room.renovation`, so door/window materials can differ depending on the path. | Unify the two paths. A small, isolated fix; not done here. |
-| Layering enforcement | Domain/engine independence from React/three.js is a convention, verified by imports today, not by an ESLint rule. | Add `no-restricted-imports` per folder. |
+| Material overrides | Renovation paths are unified (DECISIONS D21), but there is no per-door "chosen by the user" marker for materials, so a room or preset renovation overwrites a door finish picked individually. | Material provenance on doors and windows, if users need overrides to stick. |
+| Layering enforcement | Enforced by ESLint and proven by `src/architecture.test.ts` (DECISIONS D2). It does not follow what allowed npm packages import transitively. | — |
 
 ## Corpus coverage gaps
 

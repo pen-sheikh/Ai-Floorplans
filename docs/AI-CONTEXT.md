@@ -1,7 +1,7 @@
 # AI project context — read this first
 
 Canonical hand-off for any new session (human or AI). It is a summary of the repository, which
-remains the source of truth. Last verified: 2026-10-08, at commit `ff164db`.
+remains the source of truth. Last verified: 2026-10-09, on `43b5d4c` plus the uncommitted changes described below.
 
 | Doc | Contents |
 |---|---|
@@ -49,13 +49,15 @@ floor-plan image → structured apartment model → editable 2D/3D apartment
 | 2 — Architecture hardening, furniture fitting, renovation, AI boundary, persistence | **complete** (PR #2) |
 | 3 — Automatic floor-plan extraction MVP | **complete** (committed with Phase 2 in `433e24d`, PR #2) |
 | 4 — Real-world robustness, corpus, confidence/provenance, safe failure | **complete** (`ff164db`, PR #3, merged to `main`) |
-| 5 — Human-in-the-loop extraction correction | **NOT STARTED** (proposal in ROADMAP.md) |
+| 5 — Human-in-the-loop extraction correction | **IN PROGRESS**: slice 1 (move an interior wall on the accepted model) implemented; see ROADMAP.md and DECISIONS D20 |
 
-- **Git:** the current branch is `phase-5`, at `ff164db`. That is the Phase 4 commit; `main`
-  (`a96a73c`) is its merge and has an identical tree. The working tree was clean before this
-  documentation package. The package adds `docs/` and a regenerated
-  `tests/fixtures/floorplans/REPORT.md` (same metrics, current problem counts), both uncommitted
-  at the time of writing. **Always run `git status` yourself; this table goes stale.**
+- **Git:** branch `phase-5`. `ff164db` is the Phase 4 commit (merged to `main` as `a96a73c`);
+  `43b5d4c` adds this documentation. On 2026-10-09 the following were implemented on top of it
+  and left **uncommitted**:
+  - the rename-provenance, renovation-path and layer-boundary fixes;
+  - Phase 5 slice 1.
+
+  **Always run `git status` yourself; this table goes stale.**
 - **Stack:**
   - Vite 8, React 19, TypeScript 6, React Three Fiber (three.js 0.186), zustand 5;
   - Vitest 5, ESLint 10, Prettier 3;
@@ -79,7 +81,7 @@ floor-plan image → structured apartment model → editable 2D/3D apartment
 | Furniture | 20-item parametric catalog. `checkPlacement`: 8 rules (room containment, wall/fixture/furniture collision, door swing and clearance, window access, front clearance). `fitFurniture` finds valid poses. Drag, nudge, rotate, duplicate. | `engine/`, `catalog/furnitureCatalog.ts` |
 | Renovation | Per-room materials and colours (48 materials), lighting, 5 style presets | `catalog/materials.ts`, `catalog/renovationPresets.ts`, `room/renovate` |
 | AI intent boundary | Rule-based NL → `Intent` → `executeIntent` → engine → `Command`. Strict LLM JSON contract (`parseAssistantJson`) and `JsonIntentProvider` exist and are tested; **no LLM is wired in, and there are no keys** | `src/ai/` |
-| Editing | 8 serialisable commands (furniture add/update/remove, room renovate/rename, door/window update, batch), snapshot undo/redo, Cancel baseline. **No structural editing.** | `editor/commands.ts`, `state/documentStore.ts` |
+| Editing | 9 serialisable commands (furniture add/update/remove, room renovate/rename, door/window update, **wall/move**, batch), snapshot undo/redo, Cancel baseline. Structural editing: only moving an interior wall sideways (Inspector "Correct wall position"; walls selectable in 2D and 3D). | `editor/commands.ts`, `editor/wallMove.ts`, `state/documentStore.ts` |
 | Save/load | `localStorage` repository, JSON export/import, session restore; versioned project file with migrations (v1 → v2) and full validation on load | `persistence/`, `domain/serialization.ts`, `domain/migrations.ts` |
 | Validation | `validateApartment`: ids, provenance, polygons, overlaps, walls, openings, fixtures, furniture. The 3D view pauses on errors. | `domain/validation.ts` |
 | Corpus testing | 24 fixtures: e2, synthetic, real-world (15 openly licensed Wikimedia plans, cached by sha256) and pathological (generated). Metrics and `REPORT.md`. | `src/floorplan/corpus/`, `tests/fixtures/floorplans/` |
@@ -148,8 +150,10 @@ recorded in DECISIONS.md.
 2. **No plan-specific logic.** No filenames, coordinates, room names or sizes of any fixture or
    corpus plan in extractor or engine code. Thresholds scale with the plan's own measurements.
    E2 appears in production code only as the configured default plan (`config/plans.ts`).
-3. **The domain model stays independent of React and three.js.** The same holds for `engine`,
-   `editor`, `ai` and `catalog`. Today this is convention, not lint.
+3. **The domain model stays independent of React and three.js.** The same holds for every
+   pure layer (`catalog`, `engine`, `editor`, `ai`, `floorplan`, `persistence`). This is enforced
+   by ESLint and proven by `src/architecture.test.ts`. Do not weaken the rule to make an import
+   pass: move the code to the right layer instead.
 4. **The 3D renderer stays a consumer of the domain model.** Edits from 3D go through
    `planTransform` → commands → the document store.
 5. **Geometry stays deterministic.** Extraction, calibration, reconstruction and fitting are pure

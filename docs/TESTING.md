@@ -1,7 +1,8 @@
 # Testing and evidence
 
-All numbers below were measured on 2026-10-08 at commit `ff164db` (branch `phase-5`). Re-run them
-before trusting them. Nothing here was hand-edited to look better.
+Corpus numbers below were measured on 2026-10-08 at `ff164db` and re-confirmed on 2026-10-09
+(identical metrics). Test counts are from 2026-10-09 on `43b5d4c` plus the uncommitted Phase 5
+slice 1. Re-run them before trusting them. Nothing here was hand-edited to look better.
 
 ## Commands
 
@@ -16,7 +17,7 @@ before trusting them. Nothing here was hand-edited to look better.
 
 | Check | Result |
 |---|---|
-| `npm run check` | **passes**: typecheck, lint and format clean; **366 tests in 41 files pass**; production build succeeds |
+| `npm run check` | **passes**: typecheck, lint and format clean; **423 tests in 45 files pass**; production build succeeds (366 in 41 before the 2026-10-09 changes) |
 | `npm run test:corpus` | **25 tests pass** (24 fixtures + 1 fixture well-formedness test); **95 / 95 expectation checks pass**; all 15 real-world images cached |
 | Known regressions | **none** against Phase 4 expectations |
 
@@ -34,18 +35,21 @@ Build note: the `r3f` chunk is about 1.25 MB (343 kB gzip). It is within the con
 | `src/floorplan/cv` | 17 | every extractor stage: raster, morphology, walls, openings, railings, rooms (incl. `inferBoundaries`), text and lexicon, text regions, dimension lines, document check, structure filter, classifier, sanitiser, review statuses and components, metrics, robustness (polarity, tint, degradations), end-to-end extractor (stage order, failure on blank or strokes, `force`) |
 | `src/floorplan/corpus` | 1 | fixture well-formedness (unique ids, licence and page for real-world plans) plus per-fixture expectations |
 | `src/engine` | 3 | placement rules, fitting, scenario tests on E2 |
-| `src/editor` | 1 | command application and immutability |
+| `src/editor` | 4 | command application and immutability; room rename provenance; renovation paths (presets, room panel and assistant give the same door/window finishes); **wall move** (geometry, attached walls, room edges, openings, topology, `user` provenance, untouched data, every refusal path, determinism, reversibility, accepted moves on E2 and two synthetic plans) |
 | `src/ai` | 3 | intents (rule-based parsing), suggestions, LLM JSON contract (rejection cases, `JsonIntentProvider`) |
-| `src/state` | 1 | document store: dispatch, undo/redo, coalescing, rejection of edits that add validation errors |
+| `src/state` | 1 | document store: dispatch, undo/redo, coalescing, rejection of edits that add validation errors; rename and wall-move undo/redo; refused wall moves leave history untouched |
 | `src/persistence` | 1 | repository save, load and list |
 | `src/scene/builders` | 1 | wall pieces, door leaves, polygon geometry, camera poses; the model contains no three.js objects |
-| `src/ui` | 1 | 2D ↔ 3D selection sync (jsdom) |
+| `src/ui` | 1 | 2D ↔ 3D selection sync (jsdom); Phase 5 workflow: select a wall in 2D → move it from the Inspector → 2D outline and 3D wall-piece input both come from the updated model → undo |
+| `src/` (root) | 1 | `architecture.test.ts`: lints probe files through the real ESLint config; forbidden presentation imports in pure layers fail, legitimate imports pass |
 
 Not covered by automated tests:
 - `scene/builders/fixtureFrame.ts`;
 - `scene/materialCache.ts`;
 - dragging furniture in 3D (WebGL; the same `planTransform` path is tested numerically);
-- the extraction review UI.
+- the extraction review UI;
+- the wall-move controls in a real browser: the jsdom test drives the 2D view and Inspector, and
+  checks the 3D input through the pure wall builders, but WebGL rendering is not exercised.
 
 ## Ground truth
 

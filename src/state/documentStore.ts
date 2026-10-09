@@ -47,6 +47,7 @@ const HISTORY_LIMIT = 200;
 
 /** Commands that can change geometry and therefore need re-validation. */
 const touchesGeometry = (cmd: Command): boolean =>
+  cmd.type === 'wall/move' ||
   cmd.type === 'door/update' ||
   cmd.type === 'window/update' ||
   (cmd.type === 'batch' && cmd.commands.some(touchesGeometry));

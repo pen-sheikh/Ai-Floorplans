@@ -8,8 +8,8 @@ The apartment model in `src/domain/types.ts` is **the source of truth** for ever
 - the assistant.
 
 Renderers read it and never own geometry. `src/domain/` imports no React, three.js, DOM or
-catalog code. This is a convention that the folder structure and tests uphold; ESLint does not
-enforce it.
+catalog code, and no pure layer imports React, three.js, R3F, zustand or the UI and state
+folders. ESLint enforces this, and `src/architecture.test.ts` proves the rule (DECISIONS D2).
 
 The examples below are real values from the E2 reference model (`loadKnownPlan()`), rounded and
 trimmed.
@@ -128,7 +128,8 @@ const unknownRoom: Partial<Room> = {
 ```
 
 An automatically read name gives `labelSource: 'ocr'` and `sources.name/type = 'ocr'`.
-`room/rename` sets `labelSource: 'user'`, but does not currently update `sources.name`. An
+`room/rename` sets `labelSource: 'user'` and `sources.name: 'user'`, keeping type, geometry
+and the extraction confidences. An
 inferred E2 cupboard looks like this: `{ id: 'wardrobe-bed2', name: 'Built-in wardrobe', type:
 'storage', labelSource: 'inferred' }`.
 
@@ -314,7 +315,7 @@ and throws `ReconstructionError` listing every annotation error. The steps are:
 | automatic, `plan-label` (OCR name) | display name | `ocr` | `ocr` | `ocr` (omitted if type `unknown`) |
 | automatic, `inferred` (unlabelled, classifier assigned a type, e.g. storage or hall) | generated name (`Cupboard`, `Hall`…) | `inferred` | `inferred` | `inferred` |
 | automatic, `unknown` (no label, no confident type) | **"Unknown Room"** | `inferred` | — | — |
-| after `room/rename` | user's text | `user` | unchanged (not updated today) | unchanged |
+| after `room/rename` | user's text | `user` | `user` | unchanged |
 
 `labelSource` answers "how was the name obtained". `sources.name`/`sources.type` are only
 recorded for automatic annotations.
@@ -373,7 +374,7 @@ provides:
 - coalescing (a drag is one step);
 - a baseline for Cancel.
 
-The 8 commands are:
+The 9 commands are:
 
 | Command | Effect |
 |---|---|
@@ -381,11 +382,22 @@ The 8 commands are:
 | `furniture/update` | change position, rotation, dimensions, material, colour, room, name or elevation |
 | `furniture/remove` | remove an item |
 | `room/renovate` | patch the room's `renovation` |
-| `room/rename` | set the name; `labelSource: 'user'` |
+| `room/rename` | set the name (empty names are refused); `labelSource` and `sources.name` become `user` |
+| `wall/move` | move an **interior** wall `distance` metres along its normal; attached walls, room outlines, opening offsets and topology follow; changed walls and rooms get `sources.geometry: 'user'` (`editor/wallMove.ts`, DECISIONS D20) |
 | `door/update` | kind, material, width or height (dimension changes → `user` provenance) |
 | `window/update` | kind, material, sill height or height |
 | `batch` | apply several commands as one undo step |
 
-**There are no structural commands.** Walls, room polygons, door/window positions, adding or
-deleting openings, and room type cannot be edited. `door/update` and `window/update` re-validate,
-and an edit that adds validation errors is rejected.
+**Structural editing is limited to `wall/move`.** These cannot be edited yet:
+- wall endpoints;
+- exterior walls;
+- adding or deleting walls;
+- door and window positions;
+- adding or deleting openings;
+- splitting or merging rooms;
+- room type.
+
+`wall/move`, `door/update` and `window/update` are re-validated, and an edit that adds
+validation errors is rejected. Room renovation goes through `renovationCommands`
+(`editor/operations.ts`): door and window finishes in the patch are applied to that room's
+doors and windows (DECISIONS D21).

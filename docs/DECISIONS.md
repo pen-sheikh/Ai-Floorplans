@@ -28,13 +28,23 @@ useful.
 
 ## D2. The domain model is renderer- and framework-independent
 
-- **Decision:** `src/domain`, `src/engine`, `src/editor`, `src/ai` and `src/catalog` import no
-  React and no three.js.
+- **Decision:** `src/domain`, `src/catalog`, `src/engine`, `src/editor`, `src/ai`,
+  `src/floorplan` and `src/persistence` (the pure layers) import no React, three.js, React Three
+  Fiber or zustand, and no presentation or app-state folder (`scene`, `plan2d`, `ui`, `app`,
+  `state`). Production code in `src/domain` imports no other app layer at all.
 - **Reason:** the logic stays testable in Node, and a future server or worker can run it.
 - **Consequence:**
   - It is pure TypeScript with Vitest in a `node` environment.
-  - This is enforced by convention and review, **not** by an ESLint rule (see
-    REAL-WORLD-LIMITATIONS).
+  - **Enforced by ESLint** (`eslint.config.js`, part of `npm run check`):
+    `@typescript-eslint/no-restricted-imports` covers `import`, `import type`, `export … from`
+    and `import x = require()`; `no-restricted-syntax` covers dynamic `import()`.
+  - `src/architecture.test.ts` lints probe files through the real config. It proves that
+    forbidden imports are rejected and legitimate ones (domain-internal, UI using React) pass.
+  - Limitations:
+    - lint sees only this repository's import statements, not what an allowed npm package
+      imports transitively;
+    - tests inside `src/domain` may import fixtures from other layers;
+    - `src/test` (test helpers) and `src/config` (the composition root) are not restricted.
 
 ## D3. All edits are serialisable commands
 
@@ -262,9 +272,63 @@ useful.
 
 ---
 
+## D20. Phase 5 corrections start as domain commands on the accepted model
+
+- **Decision:**
+  - The first correction (moving an interior wall sideways) is a `Command` on the canonical
+    `Apartment` (`wall/move`), applied after an extraction is accepted. This is ROADMAP option
+    B, scoped to one operation.
+  - Dependent geometry is recomputed deterministically (`editor/wallMove.ts`):
+    - the wall's ends slide along the walls they meet;
+    - walls ending on it slide that end, and their openings keep their place;
+    - room edges on both faces move, and corners are re-intersected;
+    - topology is re-derived.
+  - Changed walls and rooms are marked `user`; extraction confidences stay as an audit.
+  - The operation refuses rather than approximates:
+    - exterior walls and railings;
+    - walls forming part of the building outline;
+    - straight continuations with no crossing wall at the joint;
+    - pinned or ambiguous junctions;
+    - room edges that run on past the wall;
+    - collapsed walls.
+  - `planWallMove` then validates the whole model and refuses any new validation error. The
+    document store applies the same gate again.
+- **Reason:**
+  - The accepted model is the source of truth (D1). Editing it reuses commands, snapshot
+    undo/redo, validation and persistence (D3, D18) unchanged, with no schema change.
+  - Annotation-level editing (option A) needs an annotation-format change and a
+    re-segmentation path that does not exist yet.
+- **Consequence:**
+  - 2D and 3D update automatically, because both read the store.
+  - Edits survive save and load.
+  - Room polygons are edited in place, not re-segmented, so operations that change room
+    *count* (split, merge) are not covered by this mechanism.
+- **Rejected:**
+  - moving exterior walls by also editing the footprint (later, with tests);
+  - snapping or approximating ambiguous junctions;
+  - letting an LLM or the assistant issue `wall/move` (the intent contract does not include it).
+
+## D21. One renovation path; door and window finishes are applied to the doors and windows
+
+- **Decision:**
+  - `renovationCommands(apt, roomId, patch)` (`editor/operations.ts`) is the only way a room
+    renovation becomes commands. The room panel, style presets and the assistant all use it.
+  - A patch that sets `doorMaterialId` or `windowMaterialId` also updates
+    `Door.materialId` / `Window.materialId` of every door and window of that room, because
+    those are what the renderer draws.
+  - A patch (or preset) without them leaves doors and windows alone.
+  - A door shared by two renovated rooms takes the later room's finish.
+- **Reason:**
+  - Presets explicitly define door finishes (4 of 5) and window finishes (Industrial).
+  - Before this, only the room-panel path propagated them, so a preset's "oak doors" never
+    appeared in 3D.
+- **Consequence:**
+  - There is no per-door "user override" provenance for materials, so a later room or preset
+    renovation overwrites a door finish picked individually in the inspector. This is the same
+    behaviour the room panel always had.
+
 ## Open questions (not decided)
 
 - Whether extraction should move to a Web Worker or a server (or both): Phase 6.
-- How Phase 5 corrections are represented: corrections to annotations followed by
-  re-reconstruction, or commands on the domain model. See ROADMAP.md.
-- Whether to add ESLint import-boundary rules to enforce D2.
+- Whether annotation-level correction *before* acceptance (ROADMAP option A) is still needed
+  alongside D20's domain-level edits.
