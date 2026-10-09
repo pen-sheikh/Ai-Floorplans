@@ -18,13 +18,14 @@ import type { Floor, Room, Vec2, Wall } from '../domain/types';
  * Anything this cannot do exactly is refused with a reason instead of approximated:
  * exterior walls and railings (they define the building outline), walls that continue in a
  * straight line into another wall, room edges that run on past the wall, junctions that are
- * close but not touching, and edits that would collapse an attached wall. The result is not
+ * close but not touching, room outlines that run alongside the wall close to a face but not on
+ * it, and edits that would collapse an attached wall. The result is not
  * validated here: callers validate the whole model (see `planWallMove`, and the document store).
  */
 
 /** Distance within which a point counts as lying on a wall face or centreline (metres). */
 export const JUNCTION_TOLERANCE = 0.03;
-/** Points closer than this to a wall, but not on it, make a junction ambiguous (metres). */
+/** Points closer than this to a wall, but not on it, make a junction or room boundary ambiguous (metres). */
 const AMBIGUOUS_GAP = 0.2;
 /** Shortest wall an edit may leave behind (metres). */
 const MIN_WALL_LENGTH = 0.05;
@@ -261,6 +262,25 @@ function movedRoomPolygon(poly: Vec2[], m: Frame, distance: number, lo: number, 
     return 0;
   };
   const faces = poly.map((_, i) => onFace(i));
+  // An edge running alongside the wall within reach of a face, but not on it, is ambiguous (e.g. an
+  // extracted outline a few cm off the face): left where it is, the wall would move into the room
+  // or away from it. Only the part of the edge beside the wall's length counts.
+  for (let i = 0; i < n; i++) {
+    if (faces[i]) continue;
+    const a = q[i]!;
+    const b = q[(i + 1) % n]!;
+    const run = b.along - a.along;
+    if (Math.abs(b.side - a.side) >= MIN_CROSSING * Math.hypot(run, b.side - a.side) || Math.abs(run) < 1e-9)
+      continue; // a corner, not a run alongside the wall
+    const t0 = Math.min(1, Math.max(0, (JUNCTION_TOLERANCE - a.along) / run));
+    const t1 = Math.min(1, Math.max(0, (m.length - JUNCTION_TOLERANCE - a.along) / run));
+    if (Math.abs(t1 - t0) * Math.abs(run) <= JUNCTION_TOLERANCE) continue; // beside the wall, not along it
+    const gaps = [t0, t1].map((t) => Math.abs(a.side + t * (b.side - a.side)) - m.half);
+    if (Math.max(...gaps) <= AMBIGUOUS_GAP) {
+      const off = Math.max(...gaps.map(Math.abs));
+      return `its outline runs alongside the wall up to ${(off * 100).toFixed(0)} cm off its face without lying on it; the boundary is ambiguous.`;
+    }
+  }
   if (faces.every((s) => s === 0)) return poly;
   for (let i = 0; i < n; i++) {
     if (!faces[i]) continue;

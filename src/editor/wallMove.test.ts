@@ -183,6 +183,59 @@ describe('refused wall moves (never approximated)', () => {
     expect(reason(shortened, 'w-int-hall-north', 0.1)).toMatch(/ambiguous/);
   });
 
+  describe('a room outline near, but not on, the wall face (as extracted outlines often are)', () => {
+    // Bedroom 1's edge on the north face of the hall wall, shifted `dz` metres (negative: into the
+    // bedroom, leaving a strip; positive: into the wall).
+    const id = 'w-int-hall-north';
+    const w0 = wallOf(f0, id);
+    const faceZ = w0.start.z - w0.thickness / 2;
+    const shifted = (dz: number, only?: number): Floor => ({
+      ...f0,
+      rooms: f0.rooms.map((r) =>
+        r.id === 'bedroom-1'
+          ? {
+              ...r,
+              polygon: r.polygon.map((p, i) =>
+                Math.abs(p.z - faceZ) < 1e-6 && (only === undefined || i === only)
+                  ? { ...p, z: p.z + dz }
+                  : p,
+              ),
+            }
+          : r,
+      ),
+    });
+
+    it('refuses instead of moving the wall into, or away from, the room', () => {
+      for (const dz of [-0.06, -0.15])
+        for (const distance of [0.1, -0.1]) {
+          const floor = shifted(dz);
+          const snapshot = JSON.stringify(floor);
+          expect(reason(floor, id, distance)).toMatch(
+            /Bedroom 1: .*alongside the wall .* boundary is ambiguous/,
+          );
+          expect(JSON.stringify(floor)).toBe(snapshot);
+        }
+      const plan = planWallMove({ ...e2(), floors: [shifted(-0.06)] }, id, 0.1);
+      expect(plan.command).toBeUndefined();
+      expect(plan.result.reason).toMatch(/ambiguous/);
+    });
+
+    it('refuses an outline that slants into the wall band', () => {
+      const i = f0.rooms
+        .find((r) => r.id === 'bedroom-1')!
+        .polygon.findIndex((p) => Math.abs(p.z - faceZ) < 1e-6);
+      expect(reason(shifted(0.06, i), id, 0.1)).toMatch(/ambiguous/);
+    });
+
+    it('still moves an outline within the junction tolerance, and outlines well clear of the wall', () => {
+      const near = ok(shifted(-0.02), id, 0.1);
+      expect(near.changedRooms).toContain('bedroom-1');
+      // Further than the ambiguous band: the bedroom is not beside this wall, and stays put.
+      const far = ok(shifted(-0.3), id, 0.1);
+      expect(far.changedRooms).not.toContain('bedroom-1');
+    });
+  });
+
   it('refuses a move that would collapse an attached wall', () => {
     expect(reason(f0, 'w-int-bed2-south', 0.62)).toMatch(/collapse/);
   });

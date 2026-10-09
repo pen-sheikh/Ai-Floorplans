@@ -290,6 +290,8 @@ useful.
     - straight continuations with no crossing wall at the joint;
     - pinned or ambiguous junctions;
     - room edges that run on past the wall;
+    - room outlines running alongside the wall within 20 cm of a face but not on it (common on
+      extracted plans: left in place, the wall would move into or away from the room);
     - collapsed walls.
   - `planWallMove` then validates the whole model and refuses any new validation error. The
     document store applies the same gate again.
