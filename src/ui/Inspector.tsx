@@ -2,6 +2,7 @@ import { useState } from 'react';
 import {
   dispatchCommand,
   duplicateFurniture,
+  nudgeWall,
   removeFurniture,
   renameRoom,
   rotateFurniture,
@@ -237,9 +238,62 @@ function WallInfo({ floor, id }: { floor: Floor; id: string }) {
         <dd>{openings.length}</dd>
       </dl>
       <p className="muted small">
-        Length and thickness measured from the plan drawing (id <code>{wall.id}</code>).
+        {wall.sources.geometry === 'user'
+          ? 'Position corrected by you'
+          : wall.sources.geometry === 'detected'
+            ? 'Detected automatically in the plan image'
+            : 'Length and thickness measured from the plan drawing'}{' '}
+        (id <code>{wall.id}</code>).
       </p>
+      {wall.kind === 'interior' && <WallMover id={id} towards={[a?.name, b?.name]} />}
     </>
+  );
+}
+
+/**
+ * Correct where an interior wall stands. Moves are along the wall's normal, towards one of the
+ * rooms beside it; attached walls and room outlines follow, and the model is re-validated.
+ */
+function WallMover({ id, towards }: { id: string; towards: [string | undefined, string | undefined] }) {
+  const [cm, setCm] = useState('5');
+  const step = Number(cm.replace(',', '.')) / 100;
+  const valid = Number.isFinite(step) && step > 0 && step <= 2;
+  return (
+    <div className="field">
+      <span>Correct wall position</span>
+      <div className="row small" style={{ flexWrap: 'wrap', gap: 6 }}>
+        <button
+          className="btn btn--sm"
+          disabled={!valid}
+          onClick={() => nudgeWall(id, -step)}
+          aria-label={`Move wall ${cm} cm towards ${towards[0] ?? 'the other side'}`}
+        >
+          ← {towards[0] ?? 'side A'}
+        </button>
+        <label className="row" style={{ gap: 4 }}>
+          <input
+            className="input"
+            style={{ width: 64 }}
+            inputMode="decimal"
+            value={cm}
+            onChange={(e) => setCm(e.target.value)}
+            aria-label="Move step in centimetres"
+          />
+          cm
+        </label>
+        <button
+          className="btn btn--sm"
+          disabled={!valid}
+          onClick={() => nudgeWall(id, step)}
+          aria-label={`Move wall ${cm} cm towards ${towards[1] ?? 'the other side'}`}
+        >
+          {towards[1] ?? 'side B'} →
+        </button>
+      </div>
+      <p className="muted small">
+        Moves the wall sideways; walls ending on it and the rooms on both sides follow. Undo with Ctrl+Z.
+      </p>
+    </div>
   );
 }
 

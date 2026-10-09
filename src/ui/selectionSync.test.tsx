@@ -1,8 +1,10 @@
 // @vitest-environment jsdom
 import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { planTransformOf, worldToPlan } from '../domain/coordinates';
 import { FloorPlan2D } from '../plan2d/FloorPlan2D';
-import { useDocument } from '../state/documentStore';
+import { openingSpans, pieceTransform, wallPieces } from '../scene/builders/wallPieces';
+import { selectFloor, useDocument } from '../state/documentStore';
 import { useScene } from '../state/sceneStore';
 import { Inspector } from './Inspector';
 
@@ -82,5 +84,67 @@ describe('model edits reach the 2D view', () => {
     expect(hall.getAttribute('tabindex')).toBe('0');
     fireEvent.keyDown(hall, { key: 'Enter' });
     expect(useScene.getState().selection).toEqual({ kind: 'room', id: 'hall' });
+  });
+});
+
+describe('correcting a wall position (Phase 5): one model, both views', () => {
+  afterEach(cleanup);
+
+  it('selects a wall on the plan, moves it from the inspector, and both views read the new geometry', () => {
+    const { container } = render(
+      <>
+        <FloorPlan2D />
+        <Inspector />
+      </>,
+    );
+    const id = 'w-int-bed1-bed2';
+    const doc = () => useDocument.getState();
+    const wall = () => selectFloor(doc()).walls.find((w) => w.id === id)!;
+    const before = wall();
+    const room = () => container.querySelector('polygon[data-room="bedroom-1"]')!.getAttribute('points');
+    const roomBefore = room();
+
+    // 2D selection is the shared selection the 3D view reads.
+    fireEvent.click(container.querySelector(`polygon[data-wall="${id}"]`)!);
+    expect(useScene.getState().selection).toEqual({ kind: 'wall', id });
+    fireEvent.click(screen.getByRole('button', { name: 'Move wall 5 cm towards Bedroom 1' }));
+
+    // The canonical model changed: the wall moved 5 cm towards Bedroom 1 (its +n side) and is user-corrected.
+    const after = wall();
+    expect(after.sources.geometry).toBe('user');
+    expect(Math.hypot(after.start.x - before.start.x, after.start.z - before.start.z)).toBeCloseTo(0.05, 9);
+
+    // 2D: the room outline is redrawn from the model, and the corrected wall is marked.
+    expect(room()).not.toBe(roomBefore);
+    const t = planTransformOf(doc().apartment.coordinateSystem)!;
+    const expected = selectFloor(doc())
+      .rooms.find((r) => r.id === 'bedroom-1')!
+      .polygon.map((p) => worldToPlan(p, t))
+      .map((p) => `${p.x.toFixed(1)},${p.y.toFixed(1)}`)
+      .join(' ');
+    expect(room()).toBe(expected);
+    expect(container.querySelector(`polygon[data-wall="${id}"]`)!.getAttribute('class')).toContain(
+      'plan-wall--user',
+    );
+
+    // 3D: the wall meshes are built from the same model, so they stand on the new centreline.
+    const f = selectFloor(doc());
+    const centres = wallPieces(after, openingSpans(after, f.doors, f.windows)).map(
+      (p) => pieceTransform(after, p).center,
+    );
+    for (const c of centres) expect(c.x).toBeCloseTo(after.start.x, 9);
+
+    // Undo restores both views' input.
+    act(() => doc().undo());
+    expect(wall()).toEqual(before);
+    expect(room()).toBe(roomBefore);
+  });
+
+  it('shows the wall correction controls only for interior walls', () => {
+    render(<Inspector />);
+    act(() => useScene.getState().select({ kind: 'wall', id: 'w-ext-north' }));
+    expect(screen.queryByText('Correct wall position')).toBeNull();
+    act(() => useScene.getState().select({ kind: 'wall', id: 'w-int-bed1-bed2' }));
+    expect(screen.getByText('Correct wall position')).toBeTruthy();
   });
 });

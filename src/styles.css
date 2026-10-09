@@ -860,6 +860,25 @@ table.calibration td {
   transition: fill 0.12s;
 }
 
+.plan-wall {
+  fill: transparent;
+  cursor: pointer;
+}
+
+.plan-wall:hover {
+  fill: rgba(252, 202, 84, 0.35);
+}
+
+.plan-wall--user {
+  fill: rgba(59, 130, 246, 0.45);
+  stroke: rgba(37, 99, 235, 0.9);
+  stroke-width: 1.5;
+}
+
+.plan-wall--selected {
+  fill: rgba(245, 158, 11, 0.55);
+}
+
 .plan-room:hover,
 .plan-room--hover {
   fill: rgba(252, 202, 84, 0.14);

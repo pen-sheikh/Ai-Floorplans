@@ -6,7 +6,7 @@ import { roomMetrics } from '../domain/topology';
 import type { Apartment, FurnitureItem, Room } from '../domain/types';
 import { formatArea, formatLength } from '../domain/units';
 import type { Command } from '../editor/commands';
-import { planFitMany, planPreset } from '../editor/operations';
+import { planFitMany, planPreset, renovationCommands } from '../editor/operations';
 import type { PlacementConstraints } from '../engine/constraints';
 import { explainFit, fitFurniture } from '../engine/fitting';
 import { buildIntentContext, validateIntent, type Intent, type IntentConstraints } from './intents';
@@ -136,7 +136,7 @@ ${explainFit(p, cat.name, room.name)}`,
       }
       if (intent.patch && Object.keys(intent.patch).length) {
         for (const roomId of intent.roomIds)
-          commands.push({ type: 'room/renovate', roomId, patch: intent.patch });
+          commands.push(...renovationCommands(ctx.apartment, roomId, intent.patch));
       }
       if (!commands.length)
         return { ok: false, reply: 'That style does not change anything in these rooms.' };

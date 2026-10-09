@@ -12,6 +12,8 @@ import {
   planDuplicate,
   planPreset,
   planTransform,
+  planWallMove,
+  renovationCommands,
   type TransformRequest,
 } from '../editor/operations';
 import {
@@ -130,24 +132,39 @@ export function updateFurniture(
 
 /** Renovate a room. Door/window finishes also update every door/window of that room. */
 export function renovateRoom(roomId: string, patch: Partial<RoomRenovation>): void {
-  const floor = selectFloor(useDocument.getState());
-  const room = floor.rooms.find((r) => r.id === roomId);
-  if (!room) return;
-  const commands: Command[] = [{ type: 'room/renovate', roomId, patch }];
-  if (patch.doorMaterialId) {
-    for (const id of room.doorIds)
-      commands.push({ type: 'door/update', id, patch: { materialId: patch.doorMaterialId } });
-  }
-  if (patch.windowMaterialId) {
-    for (const id of room.windowIds)
-      commands.push({ type: 'window/update', id, patch: { materialId: patch.windowMaterialId } });
-  }
+  const commands = renovationCommands(useDocument.getState().apartment, roomId, patch);
+  if (!commands.length) return;
   dispatch(commands.length === 1 ? commands[0]! : { type: 'batch', label: 'Renovate room', commands });
 }
 
 export function applyPreset(presetId: string, roomIds: string[]): void {
   const cmd = planPreset(useDocument.getState().apartment, presetId, roomIds);
   if (cmd && dispatch(cmd)) toast('success', `Applied ${cmd.type === 'batch' ? cmd.label : 'style'}.`);
+}
+
+/**
+ * Correct a wall's position: move it `distance` metres along its normal (towards its +n side).
+ * Attached walls, room outlines and topology follow; the edit is refused, with the reason,
+ * when it cannot be done exactly or would make the model invalid.
+ */
+export function nudgeWall(wallId: string, distance: number): boolean {
+  const { command, result } = planWallMove(
+    useDocument.getState().apartment,
+    wallId,
+    distance,
+    APP_VALIDATION,
+  );
+  if (!command) {
+    toast('warning', result.reason ?? 'This wall cannot be moved.');
+    return false;
+  }
+  if (!dispatch(command)) return false;
+  if (result.warnings.length)
+    toast(
+      'warning',
+      `Wall moved. Check: ${result.warnings.slice(0, 2).join(' ')}${result.warnings.length > 2 ? ' …' : ''}`,
+    );
+  return true;
 }
 
 export function renameRoom(roomId: string, name: string): void {

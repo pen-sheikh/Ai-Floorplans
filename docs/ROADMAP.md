@@ -60,9 +60,19 @@ Fixture detection is a prerequisite for good layout optimisation on extracted pl
 
 ---
 
-## Phase 5 — Human-in-the-loop extraction correction (PROPOSED)
+## Phase 5 — Human-in-the-loop extraction correction (IN PROGRESS)
 
-> **Phase 5 has not been implemented.** This section is a proposal for review.
+> **Slice 1 is implemented (uncommitted at the time of writing):** moving an interior wall
+> sideways on the accepted model (`wall/move`; DECISIONS D20).
+>
+> Workflow: select a wall in 2D or 3D → Inspector "Correct wall position" → move towards
+> either neighbouring room by N cm. Attached walls, both rooms' outlines, opening offsets and
+> topology follow; the model is re-validated; changes are marked `user`; it is undoable and
+> saved with the project.
+>
+> Everything else below is still a proposal. Option B was chosen for this slice (question 1
+> below). Option A (annotation-level correction before acceptance) remains open for operations
+> that change the number of rooms.
 
 ### Problem
 
