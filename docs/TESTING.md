@@ -17,7 +17,7 @@ slice 1. Re-run them before trusting them. Nothing here was hand-edited to look 
 
 | Check | Result |
 |---|---|
-| `npm run check` | **passes**: typecheck, lint and format clean; **423 tests in 45 files pass**; production build succeeds (366 in 41 before the 2026-10-09 changes) |
+| `npm run check` | **passes**: typecheck, lint and format clean; **426 tests in 45 files pass**; production build succeeds (366 in 41 before the 2026-10-09 changes) |
 | `npm run test:corpus` | **25 tests pass** (24 fixtures + 1 fixture well-formedness test); **95 / 95 expectation checks pass**; all 15 real-world images cached |
 | Known regressions | **none** against Phase 4 expectations |
 
@@ -35,7 +35,7 @@ Build note: the `r3f` chunk is about 1.25 MB (343 kB gzip). It is within the con
 | `src/floorplan/cv` | 17 | every extractor stage: raster, morphology, walls, openings, railings, rooms (incl. `inferBoundaries`), text and lexicon, text regions, dimension lines, document check, structure filter, classifier, sanitiser, review statuses and components, metrics, robustness (polarity, tint, degradations), end-to-end extractor (stage order, failure on blank or strokes, `force`) |
 | `src/floorplan/corpus` | 1 | fixture well-formedness (unique ids, licence and page for real-world plans) plus per-fixture expectations |
 | `src/engine` | 3 | placement rules, fitting, scenario tests on E2 |
-| `src/editor` | 4 | command application and immutability; room rename provenance; renovation paths (presets, room panel and assistant give the same door/window finishes); **wall move** (geometry, attached walls, room edges, openings, topology, `user` provenance, untouched data, every refusal path, determinism, reversibility, accepted moves on E2 and two synthetic plans) |
+| `src/editor` | 4 | command application and immutability; room rename provenance; renovation paths (presets, room panel and assistant give the same door/window finishes); **wall move** (geometry, attached walls, room edges, openings, topology, `user` provenance, untouched data, every refusal path including room outlines near but not on a face, determinism, reversibility, accepted moves on E2 and two synthetic plans) |
 | `src/ai` | 3 | intents (rule-based parsing), suggestions, LLM JSON contract (rejection cases, `JsonIntentProvider`) |
 | `src/state` | 1 | document store: dispatch, undo/redo, coalescing, rejection of edits that add validation errors; rename and wall-move undo/redo; refused wall moves leave history untouched |
 | `src/persistence` | 1 | repository save, load and list |
